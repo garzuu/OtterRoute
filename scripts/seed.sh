@@ -11,7 +11,7 @@ echo "barca" > "$tmp/barca.jpg"
 echo "listino 2026" > "$tmp/listino.pdf"
 head -c 50000000 /dev/urandom > "$tmp/grande.bin"
 
-docker run --rm --network "$net" -v "$tmp:/seed:ro" --entrypoint sh minio/mc -c '
+docker run --rm --network "$net" -v "$tmp:/seed:ro" --entrypoint sh quay.io/minio/mc -c '
   set -e
   mc alias set a http://minio-a:9000 storage-a-admin storage-a-secret >/dev/null
   mc alias set b http://minio-b:9000 storage-b-admin storage-b-secret >/dev/null

@@ -4,7 +4,7 @@
 #   curl -H 'Host: img.localhost' localhost/barca.jpg
 services:
   minio-a:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: storage-a-admin
@@ -13,7 +13,7 @@ services:
     volumes: [minio-a:/data]
 
   minio-b:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: storage-b-admin
