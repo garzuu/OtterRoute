@@ -1,0 +1,40 @@
+[package]
+name = "otterroute"
+description = "Gateway HTTP che pubblica oggetti da più bucket S3 compatibili su più domini, con cache su disco"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "otterroute"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+arc-swap = "1"
+bytes = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+clap = { version = "4", features = ["derive", "env"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+hex = "0.4"
+hmac = "0.12"
+http = "1"
+http-body-util = "0.1"
+httpdate = "1"
+hyper = { version = "1", features = ["server", "http1", "http2"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "server-auto"] }
+percent-encoding = "2"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "http2"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"

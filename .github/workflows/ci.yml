@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace
+      - name: end-to-end con finti S3
+        run: ./scripts/local-e2e.sh
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Avvio MinIO x2 + gateway
+        run: docker compose up -d --build --wait || (docker compose logs; exit 1)
+      - name: Dati di prova
+        run: ./scripts/seed.sh
+      - name: Test end-to-end
+        run: ./scripts/e2e.sh
+        env:
+          RELOAD_WAIT: "4"
+      - name: Log
+        if: always()
+        run: docker compose logs gateway

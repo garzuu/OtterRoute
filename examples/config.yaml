@@ -1,0 +1,66 @@
+# Configurazione di esempio: due storage con credenziali diverse, due domini.
+# Nel prototipo le credenziali arrivano da variabili d'ambiente; il gateway
+# rilegge il file quando cambia, se "version" aumenta.
+version: 1
+
+storages:
+  - id: storage_a
+    endpoint: http://minio-a:9000
+    region: us-east-1
+    addressing: path
+    allow_private_endpoint: true   # necessario per storage in rete locale
+    credentials:
+      access_key_env: STORAGE_A_ACCESS_KEY
+      secret_key_env: STORAGE_A_SECRET_KEY
+
+  - id: storage_b
+    endpoint: http://minio-b:9000
+    addressing: path
+    allow_private_endpoint: true
+    credentials:
+      access_key_env: STORAGE_B_ACCESS_KEY
+      secret_key_env: STORAGE_B_SECRET_KEY
+
+destinations:
+  - id: foto
+    storage: storage_a
+    bucket: catalogo
+    prefix: foto/
+    revision: 1
+    cache_generation: 1      # +1 = svuota la cache di questa destinazione
+
+  - id: documenti
+    storage: storage_b
+    bucket: documenti
+    prefix: pubblici/
+    revision: 1
+    cache_generation: 1
+
+cache_policies:
+  - id: standard
+    ttl: 1h
+    ttl_not_found: 60s
+    query_keys: []
+    serve_stale_on_error: 24h
+
+routes:
+  # img.localhost/barca.jpg → storage_a / catalogo / foto/barca.jpg
+  - id: img_root
+    host: img.localhost
+    path_prefix: /
+    destination: foto
+    cache_policy: standard
+
+  # media.localhost/foto/barca.jpg → storage_a / catalogo / foto/barca.jpg
+  - id: media_foto
+    host: media.localhost
+    path_prefix: /foto/
+    destination: foto
+    cache_policy: standard
+
+  # media.localhost/docs/listino.pdf → storage_b / documenti / pubblici/listino.pdf
+  - id: media_docs
+    host: media.localhost
+    path_prefix: /docs/
+    destination: documenti
+    cache_policy: standard
