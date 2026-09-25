@@ -31,7 +31,7 @@ COPY --from=docs /docs/.vitepress/dist /usr/share/otterroute/docs
 USER otter
 ENV OTR_CACHE_DIR=/data/cache \
     OTR_STATE_DIR=/data/state \
-    OTR_CONFIG=/etc/otterroute/config.yaml \
+    OTR_CONFIG=/data/config.yaml \
     OTR_UI_DIR=/usr/share/otterroute/ui \
     OTR_DOCS_DIR=/usr/share/otterroute/docs \
     OTR_LISTEN=0.0.0.0:80 \

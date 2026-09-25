@@ -1,34 +1,10 @@
-# Ambiente del prototipo: due MinIO con credenziali diverse e il gateway.
+# Nodo OtterRoute con pannello.
 #   docker compose up -d --build
-#   ./scripts/seed.sh
-#   curl -H 'Host: img.localhost' localhost/barca.jpg
+# Pannello (solo da questa macchina): http://127.0.0.1:9090/  ·  guida: /docs/
 services:
-  minio-a:
-    image: quay.io/minio/minio:latest
-    command: server /data --console-address :9001
-    environment:
-      MINIO_ROOT_USER: storage-a-admin
-      MINIO_ROOT_PASSWORD: storage-a-secret
-    ports: ["9000:9000", "9001:9001"]
-    volumes: [minio-a:/data]
-
-  minio-b:
-    image: quay.io/minio/minio:latest
-    command: server /data --console-address :9001
-    environment:
-      MINIO_ROOT_USER: storage-b-admin
-      MINIO_ROOT_PASSWORD: storage-b-secret
-    ports: ["9100:9000", "9101:9001"]
-    volumes: [minio-b:/data]
-
   gateway:
     build: .
-    depends_on: [minio-a, minio-b]
     environment:
-      STORAGE_A_ACCESS_KEY: storage-a-admin
-      STORAGE_A_SECRET_KEY: storage-a-secret
-      STORAGE_B_ACCESS_KEY: storage-b-admin
-      STORAGE_B_SECRET_KEY: storage-b-secret
       RUST_LOG: otterroute=info
     # porte standard: 80 HTTP pubblico, 9090 pannello solo da localhost
     ports: ["80:80", "127.0.0.1:9090:9090"]
@@ -36,10 +12,7 @@ services:
     sysctls:
       net.ipv4.ip_unprivileged_port_start: 0
     volumes:
-      - ./examples:/etc/otterroute:ro
       - gateway-data:/data
 
 volumes:
-  minio-a:
-  minio-b:
   gateway-data:

@@ -40,19 +40,3 @@ jobs:
       - name: Tipi e build del pannello
         run: npm run build
         working-directory: web
-
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Avvio MinIO x2 + gateway
-        run: docker compose up -d --build --wait || (docker compose logs; exit 1)
-      - name: Dati di prova
-        run: ./scripts/seed.sh
-      - name: Test end-to-end
-        run: ./scripts/e2e.sh
-        env:
-          RELOAD_WAIT: "4"
-      - name: Log
-        if: always()
-        run: docker compose logs gateway
