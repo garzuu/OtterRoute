@@ -1,0 +1,16 @@
+{
+  "name": "otterroute-docs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "check": "node scripts/check-parity.mjs",
+    "docs:build": "npm run check && npm run build"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}

@@ -9,103 +9,54 @@ compatibili attraverso più domini, con cache su disco. Colleghi uno storage,
 associ un dominio e ottieni un URL funzionante, senza toccare la
 configurazione di un proxy.
 
-> **Stato: prototipo tecnico.** Questa fase serve a validare il motore:
-> due domini che servono due bucket privati con credenziali diverse, con cache
-> isolata. Pannello, controller, HTTPS automatico e Helm arrivano nelle fasi
-> successive (vedi [Roadmap](#roadmap)).
+📖 **[Guida completa](https://garzuu.github.io/OtterRoute/)** (italiano) ·
+**[English guide](https://garzuu.github.io/OtterRoute/en/)** — come funziona,
+installazione, configurazione di DNS e storage per Cloudflare, Route 53,
+Google Cloud DNS, Azure DNS, OVHcloud, Aruba, AWS S3, R2, Backblaze B2, Wasabi,
+DigitalOcean Spaces, Hetzner, MinIO e Garage, sicurezza, risoluzione dei problemi.
+I sorgenti della guida sono in [`docs/`](docs/).
 
-## Cosa fa oggi
+## In breve
 
-- **Instradamento** per host e prefisso di percorso; vince il prefisso più
-  lungo, confrontato per segmenti interi (`/docs/` non intercetta `/docsx/`).
-- **Più storage S3** con credenziali separate, firma SigV4 scritta da zero,
-  indirizzamento `path` o `virtual`.
-- **Sola lettura:** `GET` e `HEAD`. La query string non viene mai inoltrata
-  allo storage e gli header `x-amz-*` non arrivano al client.
-- **Cache su disco** con limite di spazio (LRU), cache negativa breve per i
-  file mancanti, una sola richiesta allo storage per oggetto anche con molti
-  client contemporanei, streaming senza caricare il file in RAM.
-- **Svuotamento senza cancellazioni:** aumentando `cache_generation` di una
-  destinazione cambiano le chiavi di cache; le copie vecchie diventano
-  irraggiungibili e vengono eliminate dall'LRU.
-- **HTTP:** `ETag`, `If-None-Match`, `If-Modified-Since`, `Range`, `If-Range`,
-  rivalidazione con lo storage (304) delle copie scadute.
-- **Errori:** un `403 AccessDenied` dello storage (file mancante senza permesso
-  di elenco) diventa `404`; credenziali sbagliate diventano `502` e non vanno
-  mai in cache; con lo storage giù si possono servire copie scadute
-  (`serve_stale_on_error`).
-- **Configurazione** ricaricata a caldo quando il file cambia e `version`
-  aumenta; se non è valida resta attiva la precedente. L'ultima valida viene
-  salvata e usata all'avvio se quella indicata non è disponibile.
-- **Endpoint interni** (IP privati, `localhost`) consentiti solo con
-  `allow_private_endpoint: true`, controllati anche sugli indirizzi risolti
-  dal DNS: il gateway non diventa un proxy verso la rete interna.
+- **Instradamento** per host e prefisso di percorso, più bucket con credenziali separate.
+- **Sola lettura** (`GET`/`HEAD`), firma SigV4, cache su disco con una sola richiesta allo storage per oggetto.
+- **Pannello** su `127.0.0.1:9090`: domini verificati davvero (DNS + richiesta al nodo), bucket, instradamenti, statistiche, utenti con permessi e 2FA, registro attività.
+- **Notifiche** email (SMTP) e Telegram quando un dominio o un bucket va in errore, e quando rientra.
+- **Metriche Prometheus** su `/metrics`.
+- **HTTP** sulla porta 80; per HTTPS va messo davanti un proxy (vedi la guida).
 
 ## Avvio rapido
 
 ```sh
-docker compose up -d --build     # due MinIO con credenziali diverse + gateway
-./scripts/seed.sh                 # bucket privati con file di prova
-
-curl -H 'Host: img.localhost'   localhost:8080/barca.jpg
-curl -H 'Host: media.localhost' localhost:8080/docs/listino.pdf
-curl localhost:9090/status        # regole attive e stato della cache
-
-./scripts/e2e.sh                  # test end-to-end
+docker build -t otterroute .
+docker run -d --name otterroute \
+  -p 80:80 -p 127.0.0.1:9090:9090 \
+  -v otterroute-data:/data \
+  otterroute
 ```
 
-Senza Docker, con due finti S3 che verificano davvero la firma SigV4
-(solo Python 3 e Perl, nessuna dipendenza):
+Apri `http://127.0.0.1:9090/`, crea l'amministratore e segui la
+configurazione guidata. La guida è disponibile anche offline sulla stessa
+porta, a `http://127.0.0.1:9090/docs/`.
+
+## Sviluppo
 
 ```sh
-./scripts/local-e2e.sh            # compila, avvia tutto e lancia i test end-to-end
+cargo test --workspace            # include i controlli sulla documentazione
+./scripts/local-e2e.sh            # compila, avvia due finti S3 con firma SigV4 e lancia i test end-to-end
+./scripts/auth-smoke.sh           # utenti, scope, 2FA e audit contro un'istanza vera
+cd web  && npm ci && npm run build   # pannello
+cd docs && npm ci && npm run dev     # guida (npm run docs:build: parità IT/EN + link)
 ```
 
-## Configurazione
+I test in `crates/gateway/src/docs_check.rs` confrontano la documentazione con
+il codice: esempi `config.yaml`, variabili `OTR_*`, scope e metriche. Una
+pagina inglese va aggiornata insieme a quella italiana (`source_commit`).
 
-Vedi [`examples/config.yaml`](examples/config.yaml). Le entità sono:
+## Stato e roadmap
 
-| Entità | Contenuto |
-|---|---|
-| `storages` | endpoint, regione, indirizzamento, credenziali (per ora da variabili d'ambiente) |
-| `destinations` | storage, bucket, cartella, `revision`, `cache_generation` |
-| `cache_policies` | `ttl`, `ttl_not_found`, `query_keys` ammesse, `serve_stale_on_error` |
-| `routes` | `host`, `path_prefix`, `strip_prefix`, destinazione, politica |
-
-Esempio: con la regola `media.azienda.it` + `/docs/` → destinazione
-`documenti` (bucket `documenti`, cartella `pubblici/`), la richiesta
-`media.azienda.it/docs/listino.pdf` legge `documenti/pubblici/listino.pdf`.
-
-Regole di validazione (bloccanti): coppia host + prefisso unica, riferimenti
-esistenti, niente `.`/`..`/`//` nei prefissi, niente porta o wildcard
-nell'host, credenziali presenti.
-
-### Opzioni del nodo
-
-| Variabile | Default | |
-|---|---|---|
-| `OTR_CONFIG` | `config.yaml` | configurazione pubblicata |
-| `OTR_LISTEN` | `0.0.0.0:8080` | traffico pubblico |
-| `OTR_ADMIN_LISTEN` | `127.0.0.1:9090` | `/healthz`, `/status` |
-| `OTR_CACHE_DIR` | `./data/cache` | |
-| `OTR_CACHE_MAX_BYTES` | 10 GiB | |
-| `OTR_CACHE_MAX_OBJECT_BYTES` | 1 GiB | oggetti più grandi: niente cache |
-| `OTR_STATE_DIR` | `./data/state` | ultima configurazione valida |
-| `OTR_RELOAD_INTERVAL` | `2s` | |
-
-La risposta indica cosa è successo con `X-Cache`: `HIT`, `MISS`, `STALE`,
-`REVALIDATED`, `BYPASS`.
-
-## Limiti noti del prototipo
-
-- `HEAD` e `Range` senza copia in cache passano allo storage senza riempire
-  la cache: il primo accesso a un video a pezzi non lo mette in cache.
-- Mentre un oggetto viene scaricato, le altre richieste aspettano fino a 5
-  secondi, poi vanno allo storage senza cache.
-- Niente HTTPS integrato: per ora va messo davanti un proxy.
-- Niente `index.html` per le cartelle (scelta dell'MVP).
-
-## Roadmap
+Prototipo con pannello: motore, pannello, utenti e statistiche funzionano su un
+singolo nodo.
 
 | Fase | Risultato verificabile |
 |---|---|
@@ -113,6 +64,14 @@ La risposta indica cosa è successo con `X-Cache`: `HIT`, `MISS`, `STALE`,
 | MVP singolo nodo | HTTPS automatico, controller, pannello, diagnostica, backup e ripristino |
 | Versione cluster | Helm, configurazioni sincronizzate, stato di applicazione per replica |
 | Estensioni | Link firmati, ottimizzazione immagini, accessi separati per clienti |
+
+## English
+
+OtterRoute is a self-hosted, read-only gateway that publishes files from several
+private S3-compatible buckets through several domains, with a disk cache. Run
+the Docker command above, open `http://127.0.0.1:9090/`, create the
+administrator and follow the guided setup. Full documentation, including DNS and
+S3 provider guides: <https://garzuu.github.io/OtterRoute/en/>.
 
 ## Licenza
 

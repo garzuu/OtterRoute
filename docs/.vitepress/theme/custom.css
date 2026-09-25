@@ -1,0 +1,32 @@
+/* Colori del pannello (web/src/styles.css): turchese del logo su fondo chiaro. */
+:root {
+  --vp-c-brand-1: #0e7f8a;
+  --vp-c-brand-2: #0b6a74;
+  --vp-c-brand-3: #0e7f8a;
+  --vp-c-brand-soft: rgba(14, 127, 138, 0.12);
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #0f2537 30%, #0e7f8a);
+  --vp-button-brand-bg: #0e7f8a;
+  --vp-button-brand-hover-bg: #0b6a74;
+  --vp-button-brand-active-bg: #095760;
+}
+.dark {
+  --vp-c-brand-1: #3fb6c2;
+  --vp-c-brand-2: #5cc7d1;
+  --vp-c-brand-3: #3fb6c2;
+  --vp-c-brand-soft: rgba(63, 182, 194, 0.16);
+  --vp-home-hero-name-background: linear-gradient(120deg, #e7edf3 20%, #3fb6c2);
+  --vp-button-brand-bg: #3fb6c2;
+  --vp-button-brand-text: #06262b;
+  --vp-button-brand-hover-bg: #5cc7d1;
+  --vp-button-brand-hover-text: #06262b;
+}
+
+/* Illustrazioni della lontra: piccole, centrate, senza bordo. */
+.otter { display: block; margin: 1.5rem auto; max-width: 180px; }
+.otter.left { margin-left: 0; }
+
+/* Riquadro "Fonti" delle schede dei provider */
+.sources { margin: 2rem 0 0; padding: 1rem 1.25rem; border: 1px solid var(--vp-c-divider); border-radius: 8px; background: var(--vp-c-bg-soft); font-size: 0.9rem; }
+.sources p { margin: 0 0 0.5rem; font-weight: 600; }
+.sources ul { margin: 0; padding-left: 1.2rem; }

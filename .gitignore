@@ -2,3 +2,7 @@
 .DS_Store
 /data
 /.cargo
+node_modules/
+web/dist/
+docs/.vitepress/dist/
+docs/.vitepress/cache/

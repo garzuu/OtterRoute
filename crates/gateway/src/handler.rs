@@ -40,6 +40,10 @@ pub struct AppState {
     pub snapshot: ArcSwap<Snapshot>,
     pub cache: Arc<Cache>,
     pub max_object_bytes: u64,
+    /// identità del nodo, usata per dimostrare che risponde lui su un dominio
+    pub node_id: String,
+    /// contatori di traffico (dashboard e /metrics)
+    pub metrics: Arc<crate::metrics::Metrics>,
 }
 
 struct Ctx {
@@ -122,20 +126,70 @@ pub async fn handle(
 ) -> Result<Response<Body>, Infallible> {
     let t0 = Instant::now();
     let (parts, _) = req.into_parts();
-    let resp = match handle_inner(&state, &parts).await {
-        Ok(r) => r,
-        Err(e) => e.into_response(),
-    };
+    let tag = Arc::new(crate::metrics::ReqTag::default());
+    let resp = crate::metrics::scope(tag.clone(), async {
+        match handle_inner(&state, &parts).await {
+            Ok(r) => r,
+            Err(e) => e.into_response(),
+        }
+    })
+    .await;
+    let ms = t0.elapsed().as_millis() as u64;
+    let cache = resp
+        .headers()
+        .get("x-cache")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
     tracing::info!(
         method = %parts.method,
         host = parts.headers.get(header::HOST).and_then(|v| v.to_str().ok()).unwrap_or("-"),
         path = parts.uri.path(),
         status = resp.status().as_u16(),
-        cache = resp.headers().get("x-cache").and_then(|v| v.to_str().ok()).unwrap_or("-"),
-        ms = t0.elapsed().as_millis() as u64,
+        cache = cache.as_deref().unwrap_or("-"),
+        ms,
         "request"
     );
-    Ok(resp)
+    // i controlli dei domini fatti dal pannello non sono traffico
+    if parts.uri.path() == crate::dns::CHECK_PATH {
+        return Ok(resp);
+    }
+    let sample = crate::metrics::RequestSample::new(
+        &tag,
+        parts.uri.path(),
+        resp.status().as_u16(),
+        cache.as_deref(),
+        ms,
+    );
+    let (rp, body) = resp.into_parts();
+    Ok(Response::from_parts(rp, state.metrics.track(body, sample)))
+}
+
+/// Risposta di verifica: la usa il pannello per controllare che un dominio
+/// arrivi davvero a questo nodo. Vale per qualsiasi host, prima delle regole.
+fn node_proof(state: &AppState, parts: &http::request::Parts) -> Response<Body> {
+    let nonce: String = parts
+        .uri
+        .query()
+        .unwrap_or_default()
+        .split('&')
+        .find_map(|kv| kv.strip_prefix("nonce="))
+        .unwrap_or_default()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .take(64)
+        .collect();
+    let body = serde_json::json!({
+        "otterroute": true,
+        "proof": crate::dns::proof(&state.node_id, &nonce),
+    });
+    let mut r = Response::new(body::full(body.to_string()));
+    r.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r
 }
 
 async fn handle_inner(
@@ -148,12 +202,16 @@ async fn handle_inner(
             "method not allowed",
         ));
     }
+    if parts.uri.path() == crate::dns::CHECK_PATH {
+        return Ok(node_proof(state, parts));
+    }
     let host = request_host(parts).ok_or(HttpError(StatusCode::BAD_REQUEST, "bad host"))?;
     let path = normalize_path(parts.uri.path())
         .map_err(|_| HttpError(StatusCode::BAD_REQUEST, "bad path"))?;
 
     let snap = state.snapshot.load_full();
     let route = snap.match_route(&host, &path).ok_or(NOT_FOUND)?.clone();
+    crate::metrics::note_route(&route.id);
     let key = route.object_key(&path).ok_or(NOT_FOUND)?;
     let ck = cache_key(
         &route,
@@ -291,10 +349,12 @@ async fn fetch_and_fill(
             Ok(r)
         }
         Fetch::Misconfigured(msg) => {
+            crate::metrics::note_upstream_error(&d.storage.id);
             tracing::error!(route = %route.id, storage = %d.storage.id, %msg, "storage rifiuta le credenziali");
             Err(BAD_GATEWAY)
         }
         Fetch::Upstream(msg) => {
+            crate::metrics::note_upstream_error(&d.storage.id);
             tracing::warn!(route = %route.id, storage = %d.storage.id, %msg, "storage non disponibile");
             match stale {
                 Some(s) if s.is_usable_stale(policy) => {
@@ -398,10 +458,12 @@ async fn passthrough(
         Fetch::NotFound => Err(NOT_FOUND),
         Fetch::NotModified => Err(BAD_GATEWAY),
         Fetch::Misconfigured(msg) => {
+            crate::metrics::note_upstream_error(&d.storage.id);
             tracing::error!(route = %route.id, storage = %d.storage.id, %msg, "storage rifiuta le credenziali");
             Err(BAD_GATEWAY)
         }
         Fetch::Upstream(msg) => {
+            crate::metrics::note_upstream_error(&d.storage.id);
             tracing::warn!(route = %route.id, storage = %d.storage.id, %msg, "storage non disponibile");
             match stale {
                 Some(s) if s.is_usable_stale(&route.policy) => {
