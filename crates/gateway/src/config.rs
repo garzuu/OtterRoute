@@ -7,7 +7,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::s3;
@@ -30,7 +30,7 @@ pub struct RawConfig {
     pub routes: Vec<RawRoute>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Addressing {
     /// `https://endpoint/bucket/key` (MinIO, Garage, SeaweedFS, ...)
@@ -53,13 +53,67 @@ pub struct RawStorage {
     pub allow_private_endpoint: bool,
 }
 
-/// Nel prototipo le credenziali arrivano da variabili d'ambiente.
+/// Le credenziali arrivano da variabili d'ambiente (`access_key_env` +
+/// `secret_key_env`) oppure da un file JSON `{"access_key", "secret_key"}`
+/// (`secret_file`), che è quello che scrive il pannello di onboarding.
 /// Nell'MVP diventeranno un riferimento a un segreto cifrato gestito dal controller.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RawCredentials {
-    pub access_key_env: String,
-    pub secret_key_env: String,
+    #[serde(default)]
+    pub access_key_env: Option<String>,
+    #[serde(default)]
+    pub secret_key_env: Option<String>,
+    #[serde(default)]
+    pub secret_file: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct SecretFile {
+    access_key: String,
+    secret_key: String,
+}
+
+/// Coppia (access key, secret key) risolta dalla configurazione.
+fn resolve_credentials(
+    c: &RawCredentials,
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Result<(String, String), String> {
+    let non_empty = |v: Option<String>| v.filter(|v| !v.is_empty());
+    match (&c.secret_file, &c.access_key_env, &c.secret_key_env) {
+        (Some(_), None, None) => {}
+        (None, Some(_), Some(_)) => {}
+        (Some(_), _, _) => {
+            return Err(
+                "credenziali: usa secret_file oppure le variabili d'ambiente, non entrambi".into(),
+            )
+        }
+        _ => {
+            return Err(
+                "credenziali: indica secret_file oppure access_key_env + secret_key_env".into(),
+            )
+        }
+    }
+    if let Some(path) = &c.secret_file {
+        let raw = std::fs::read(path)
+            .map_err(|e| format!("credenziali: impossibile leggere {path}: {e}"))?;
+        let f: SecretFile = serde_json::from_slice(&raw)
+            .map_err(|e| format!("credenziali: {path} non valido: {e}"))?;
+        if f.access_key.is_empty() || f.secret_key.is_empty() {
+            return Err(format!("credenziali: {path} contiene chiavi vuote"));
+        }
+        return Ok((f.access_key, f.secret_key));
+    }
+    let (ak_env, sk_env) = (
+        c.access_key_env.as_deref().unwrap_or_default(),
+        c.secret_key_env.as_deref().unwrap_or_default(),
+    );
+    match (non_empty(env(ak_env)), non_empty(env(sk_env))) {
+        (Some(a), Some(s)) => Ok((a, s)),
+        _ => Err(format!(
+            "credenziali mancanti (variabili {ak_env} / {sk_env})"
+        )),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -180,6 +234,14 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    /// Nessuna regola: lo stato di un nodo appena installato, prima dell'onboarding.
+    pub fn empty() -> Self {
+        Snapshot {
+            version: 0,
+            routes_by_host: HashMap::new(),
+        }
+    }
+
     pub fn route_count(&self) -> usize {
         self.routes_by_host.values().map(Vec::len).sum()
     }
@@ -217,14 +279,12 @@ pub fn validate(rc: RawConfig, env: &dyn Fn(&str) -> Option<String>) -> anyhow::
         if s.region.trim().is_empty() {
             errs.push(format!("{ctx}: region vuota"));
         }
-        let ak = env(&s.credentials.access_key_env).filter(|v| !v.is_empty());
-        let sk = env(&s.credentials.secret_key_env).filter(|v| !v.is_empty());
-        let (Some(access_key), Some(secret_key)) = (ak, sk) else {
-            errs.push(format!(
-                "{ctx}: credenziali mancanti (variabili {} / {})",
-                s.credentials.access_key_env, s.credentials.secret_key_env
-            ));
-            continue;
+        let (access_key, secret_key) = match resolve_credentials(&s.credentials, env) {
+            Ok(c) => c,
+            Err(e) => {
+                errs.push(format!("{ctx}: {e}"));
+                continue;
+            }
         };
         let client = match s3::build_client(s.allow_private_endpoint) {
             Ok(c) => c,
@@ -397,7 +457,7 @@ pub fn validate(rc: RawConfig, env: &dyn Fn(&str) -> Option<String>) -> anyhow::
 // Normalizzazioni e controlli
 // ---------------------------------------------------------------------------
 
-fn valid_id(id: &str) -> bool {
+pub fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id
@@ -465,7 +525,7 @@ pub fn normalize_bucket_prefix(p: &str) -> Result<String, String> {
     }
 }
 
-fn check_endpoint(raw: &str, allow_private: bool) -> Result<Url, String> {
+pub fn check_endpoint(raw: &str, allow_private: bool) -> Result<Url, String> {
     let u = Url::parse(raw).map_err(|e| format!("endpoint non valido: {e}"))?;
     if u.scheme() != "https" && u.scheme() != "http" {
         return Err("endpoint: schema ammesso solo http o https".into());
@@ -556,6 +616,25 @@ routes:
         let e = parse_with(&y).unwrap_err().to_string();
         assert!(e.contains("storage 'nope'"), "{e}");
         assert!(e.matches("destination 'd1'").count() >= 2, "{e}");
+    }
+
+    #[test]
+    fn secret_file_credentials() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("st_a.json");
+        std::fs::write(&f, r#"{"access_key":"AK","secret_key":"SK"}"#).unwrap();
+        let y = BASE.replace(
+            "credentials: { access_key_env: A, secret_key_env: B }",
+            &format!("credentials: {{ secret_file: {} }}", f.display()),
+        );
+        parse_with(&y).unwrap();
+        let both = BASE.replace(
+            "secret_key_env: B",
+            &format!("secret_key_env: B, secret_file: {}", f.display()),
+        );
+        assert!(parse_with(&both).is_err());
+        let missing = y.replace("st_a.json", "nope.json");
+        assert!(parse_with(&missing).is_err());
     }
 
     #[test]

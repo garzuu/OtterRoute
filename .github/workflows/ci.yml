@@ -26,6 +26,21 @@ jobs:
       - name: end-to-end con finti S3
         run: ./scripts/local-e2e.sh
 
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - name: Tipi e build del pannello
+        run: npm run build
+        working-directory: web
+
   e2e:
     runs-on: ubuntu-latest
     steps:

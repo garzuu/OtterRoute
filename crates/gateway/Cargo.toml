@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"
+argon2 = { version = "0.5", features = ["std", "rand"] }
 arc-swap = "1"
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -35,6 +36,10 @@ tokio-util = { version = "0.7", features = ["io"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2"
+hickory-resolver = { version = "0.26.3", default-features = false, features = ["tokio", "system-config"] }
+sha1 = "0.10"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "builder", "tokio1-rustls-tls", "hostname", "tokio1"] }
 
 [dev-dependencies]
 tempfile = "3"

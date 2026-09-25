@@ -76,6 +76,16 @@ check "credenziali sbagliate non in cache" "502|" "$(sc -H 'Host: broken.localho
 grep -q 'SignatureDoesNotMatch' "$work/gateway.log" && check "errore credenziali nel log" 1 1 || check "errore credenziali nel log" 1 0
 grep -q 'configurazione rifiutata' "$work/gateway.log" && check "config non valida rifiutata nel log" 1 1 || check "config non valida rifiutata nel log" 1 0
 
+echo "== statistiche (/metrics sulla porta admin)"
+m="$(curl -s 127.0.0.1:19090/metrics)"
+mhas() { grep -qE "$1" <<<"$m" && echo 1 || echo 0; }
+check "richieste HIT contate" 1 "$(mhas 'otterroute_requests_total\{route="img_root",cache="HIT",class="2xx"\} [1-9]')"
+check "richieste MISS contate" 1 "$(mhas 'otterroute_requests_total\{route="img_root",cache="MISS",class="2xx"\} [1-9]')"
+check "404 contati come 4xx" 1 "$(mhas 'otterroute_requests_total\{route="img_root",cache="[A-Z]+|none",class="4xx"\} [1-9]')"
+check "byte inviati > 0" 1 "$(mhas 'otterroute_response_bytes_total\{route="img_root"\} [1-9]')"
+check "cache in metriche" 1 "$(mhas 'otterroute_cache_entries [1-9]')"
+check "i controlli dei domini non sono traffico" 0 "$(mhas 'well-known')"
+
 echo "== storage giù: copie scadute (serve_stale_on_error)"
 # forziamo la scadenza: ttl a 1s con nuova versione
 v="$(awk '/^version:/{print $2}' "$work/config.yaml")"
@@ -89,6 +99,9 @@ kill "${pids[1]}"; wait "${pids[1]}" 2>/dev/null
 check "storage B giù → copia scaduta" "200|STALE" "$(sc -H 'Host: media.localhost' $GW/docs/listino.pdf)"
 check "storage B giù, contenuto" "listino 2026" "$(curl -s -H 'Host: media.localhost' $GW/docs/listino.pdf)"
 check "storage B giù, file mai visto → 502" "502|" "$(sc -H 'Host: media.localhost' $GW/docs/altro.pdf)"
+
+m="$(curl -s 127.0.0.1:19090/metrics)"
+check "errori di storage contati" 1 "$(mhas 'otterroute_upstream_errors_total\{route="media_docs",storage="storage_b"\} [1-9]')"
 
 echo "== stato"
 curl -s 127.0.0.1:19090/status | python3 -c "import json,sys; d=json.load(sys.stdin); print('  config_version', d['config_version'], '| regole', len(d['routes']), '| cache', d['cache'])"
