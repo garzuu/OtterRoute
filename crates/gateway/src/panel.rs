@@ -37,6 +37,9 @@ pub struct Settings {
     /// certificati HTTPS automatici
     #[serde(default)]
     pub acme: AcmeSettings,
+    /// dominio su cui il pannello si serve anche in HTTPS (oltre alla porta locale)
+    #[serde(default)]
+    pub admin_host: Option<String>,
 }
 
 /// Certificati automatici (ACME): con `enabled` il nodo li ottiene e li rinnova da solo.

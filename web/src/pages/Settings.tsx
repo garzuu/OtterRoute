@@ -63,6 +63,31 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
     }
   };
 
+  // pannello in HTTPS: solo i domini con certificato in uso e senza instradamenti
+  const adminHost = state.panel.settings.admin_host;
+  const eligible = state.panel.domains.filter(
+    (d) => state.certs.find((c) => c.host === d.host)?.serving && !state.panel.rules.some((r) => r.domain === d.host),
+  );
+  const [pick, setPick] = useState("");
+  const [adminMsg, setAdminMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [adminBusy, setAdminBusy] = useState(false);
+  const setAdmin = async (host: string | null) => {
+    setAdminBusy(true);
+    setAdminMsg(null);
+    try {
+      const r = await api.setAdminHost(host);
+      await refresh();
+      setAdminMsg({
+        ok: true,
+        text: host ? `Attivo: apri ${r.url}${r.warnings.length ? ` — Attenzione: ${r.warnings.join(" ")}` : ""}` : "Disattivato: il pannello resta solo sulla porta locale.",
+      });
+    } catch (e) {
+      setAdminMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
   return (
     <Page title="Impostazioni" lead="Le porte standard del nodo. Cambiale solo se il tuo ambiente lo richiede.">
       <div className="card">
@@ -129,6 +154,46 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
           <button className="primary" onClick={saveAcme} disabled={acmeBusy || !acmeDirty || !canWrite} title={canWrite ? undefined : needScope("settings:write")}>
             {acmeBusy ? "Salvo…" : "Salva"}
           </button>
+        </div>
+      </div>
+      <div className="card">
+        <h2>Pannello in HTTPS</h2>
+        <p className="muted">
+          Di norma il pannello risponde solo sulla porta locale (<code>127.0.0.1:9090</code>). Qui puoi servirlo anche in <strong>HTTPS</strong> su un dominio di questo nodo, con il suo certificato, per usarlo da browser senza tunnel. Il dominio deve avere un certificato in uso e non servire file.
+        </p>
+        <div className="box warn">
+          Il pannello diventa raggiungibile da Internet: proteggilo con password lunghe e con la verifica in due passaggi obbligatoria (Utenti → Sicurezza). Con Cloudflare usa SSL <strong>Full</strong>, non Flexible.
+        </div>
+        {adminHost ? (
+          <p>
+            Attivo su <code>{adminHost}</code>. L’HTTP di quel dominio reindirizza a HTTPS.
+          </p>
+        ) : eligible.length === 0 ? (
+          <p className="muted">Nessun dominio adatto: serve un dominio con un certificato in uso (Domini → HTTPS) e senza instradamenti.</p>
+        ) : (
+          <Field label="Dominio del pannello">
+            <select value={pick} onChange={(e) => setPick(e.target.value)} disabled={!canWrite}>
+              <option value="">Scegli un dominio…</option>
+              {eligible.map((d) => (
+                <option key={d.host} value={d.host}>
+                  {d.host}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {adminMsg && <div className={`box ${adminMsg.ok ? "good" : "bad"}`}>{adminMsg.text}</div>}
+        <div className="nav">
+          <span />
+          {adminHost ? (
+            <button className="secondary" onClick={() => setAdmin(null)} disabled={adminBusy || !canWrite}>
+              Disattiva
+            </button>
+          ) : (
+            <button className="primary" onClick={() => setAdmin(pick)} disabled={adminBusy || !pick || !canWrite} title={canWrite ? undefined : needScope("settings:write")}>
+              Attiva
+            </button>
+          )}
         </div>
       </div>
     </Page>

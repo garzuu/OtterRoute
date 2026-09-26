@@ -29,6 +29,39 @@ use crate::s3;
 use crate::sign;
 
 const MAX_BODY: usize = 64 * 1024;
+/// Il dominio (con certificato) su cui il pannello si serve in HTTPS dal listener pubblico.
+#[derive(Default)]
+pub struct AdminGate {
+    host: std::sync::RwLock<Option<String>>,
+}
+
+impl AdminGate {
+    pub fn set(&self, host: Option<String>) {
+        *self.host.write().unwrap() = host;
+    }
+    pub fn get(&self) -> Option<String> {
+        self.host.read().unwrap().clone()
+    }
+    /// La richiesta è per il dominio del pannello?
+    pub fn is_admin<B>(&self, req: &Request<B>) -> bool {
+        let Some(h) = self.get() else { return false };
+        crate::routing::host_of(req.uri(), req.headers()).is_some_and(|x| x == h)
+    }
+}
+
+tokio::task_local! {
+    /// la richiesta arriva su una connessione TLS: il cookie di sessione diventa `Secure`
+    static SECURE: bool;
+}
+
+/// Il pannello servito dal listener pubblico HTTPS.
+pub async fn handle_secure(
+    admin: Arc<Admin>,
+    req: Request<hyper::body::Incoming>,
+) -> Result<Response<Body>, Infallible> {
+    SECURE.scope(true, handle(admin, req)).await
+}
+
 pub struct Admin {
     pub state: Arc<AppState>,
     pub config_path: PathBuf,
@@ -49,6 +82,7 @@ pub struct Admin {
     pub auth: Auth,
     pub notifier: Arc<crate::notify::Notifier>,
     pub acme: Arc<crate::acme::Acme>,
+    pub gate: Arc<AdminGate>,
 }
 
 pub async fn handle(
@@ -120,7 +154,7 @@ pub fn access(method: &Method, path: &str) -> Option<Access> {
     Some(match (m, path) {
         ("GET", "/api/panel") => Open,
         ("GET", "/api/metrics") => Scope("metrics:read"),
-        ("PUT", "/api/settings" | "/api/https") => Scope("settings:write"),
+        ("PUT", "/api/settings" | "/api/https" | "/api/admin-host") => Scope("settings:write"),
         (
             "POST",
             "/api/domains"
@@ -221,6 +255,7 @@ async fn api(
         (&Method::PUT, "/api/settings") => with_body!(SettingsReq, save_settings),
         (&Method::POST, "/api/domains") => with_body!(HostReq, add_domain),
         (&Method::PUT, "/api/https") => with_body!(HttpsReq, save_https),
+        (&Method::PUT, "/api/admin-host") => with_body!(AdminHostReq, set_admin_host),
         (&Method::POST, "/api/certs/issue") => with_body!(HostReq, issue_cert),
         (&Method::POST, "/api/certs/upload") => with_body!(UploadCertReq, upload_cert),
         (&Method::POST, "/api/domains/redirect") => with_body!(RedirectReq, set_redirect),
@@ -272,18 +307,29 @@ struct Credentials {
     password: String,
 }
 
+/// `; Secure` se la richiesta arriva su TLS.
+fn secure_attr() -> &'static str {
+    if SECURE.try_with(|s| *s).unwrap_or(false) {
+        "; Secure"
+    } else {
+        ""
+    }
+}
+
 fn session_cookie(token: &str) -> String {
     format!(
-        "{}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
+        "{}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}{}",
         auth::COOKIE,
-        auth::SESSION_TTL.as_secs()
+        auth::SESSION_TTL.as_secs(),
+        secure_attr()
     )
 }
 
 fn clear_cookie() -> String {
     format!(
-        "{}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
-        auth::COOKIE
+        "{}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0{}",
+        auth::COOKIE,
+        secure_attr()
     )
 }
 
@@ -1035,6 +1081,60 @@ async fn notifications_test(admin: &Admin, req: NotifyTestReq) -> Response<Body>
     }
 }
 
+// --- pannello in HTTPS --------------------------------------------------------
+
+#[derive(Deserialize)]
+struct AdminHostReq {
+    /// `null` = disattiva
+    host: Option<String>,
+}
+
+async fn set_admin_host(admin: &Admin, req: AdminHostReq) -> Response<Body> {
+    let _g = admin.write_lock.lock().await;
+    let mut p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let host = req
+        .host
+        .map(|h| h.trim().to_ascii_lowercase())
+        .filter(|h| !h.is_empty());
+    let mut warnings: Vec<&str> = Vec::new();
+    if let Some(h) = &host {
+        if !p.domains.iter().any(|d| &d.host == h) {
+            return error(StatusCode::NOT_FOUND, "dominio non censito");
+        }
+        if p.rules.iter().any(|r| &r.domain == h) {
+            return bad("questo dominio serve già dei file: scegline uno dedicato al pannello");
+        }
+        if !admin.state.tls.is_listening() {
+            return bad("il nodo non è in ascolto per HTTPS (porta 443 non disponibile): il pannello non sarebbe raggiungibile");
+        }
+        if !admin.state.tls.store.has(h) {
+            return bad("il dominio non ha ancora un certificato: ottienilo o caricalo prima, altrimenti il pannello non si aprirebbe");
+        }
+        if admin.auth.users.policy().require_2fa == "off" {
+            warnings.push("la verifica in due passaggi non è obbligatoria: su un pannello raggiungibile da Internet conviene renderla obbligatoria (Utenti → Sicurezza)");
+        }
+    }
+    p.settings.admin_host = host.clone();
+    if let Err(r) = save_panel(admin, &p) {
+        return r;
+    }
+    admin.gate.set(host.clone());
+    audit::log(
+        "admin.host",
+        &host.clone().unwrap_or_else(|| "disattivato".into()),
+    );
+    let url = host
+        .as_ref()
+        .map(|h| admin.state.tls.https_location(h, "/"));
+    json(
+        StatusCode::OK,
+        json!({ "host": host, "url": url, "warnings": warnings }),
+    )
+}
+
 // --- HTTPS ------------------------------------------------------------------
 
 #[derive(Deserialize)]
@@ -1285,6 +1385,12 @@ async fn delete_domain(admin: &Admin, host: &str) -> Response<Body> {
         return error(
             StatusCode::CONFLICT,
             "elimina prima gli instradamenti di questo dominio",
+        );
+    }
+    if p.settings.admin_host.as_deref() == Some(host) {
+        return error(
+            StatusCode::CONFLICT,
+            "questo dominio serve il pannello: disattivalo prima in Impostazioni",
         );
     }
     let before = p.domains.len();
@@ -1638,6 +1744,9 @@ async fn add_rule(admin: &Admin, req: RuleReq) -> Response<Body> {
         Err(r) => return r,
     };
     let domain = req.domain.trim().to_ascii_lowercase();
+    if p.settings.admin_host.as_deref() == Some(domain.as_str()) {
+        return bad("questo dominio serve il pannello: disattiva prima il pannello in HTTPS");
+    }
     match p.domains.iter().find(|d| d.host == domain) {
         None => return bad("il dominio non è censito"),
         Some(d) if !d.verified => {
@@ -2528,6 +2637,38 @@ fn serve_static(admin: &Admin, path: &str) -> Response<Body> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn admin_gate_matches_only_its_host() {
+        let gate = AdminGate::default();
+        let req = |host: &str| {
+            Request::builder()
+                .uri("/x")
+                .header("host", host)
+                .body(())
+                .unwrap()
+        };
+        assert!(
+            !gate.is_admin(&req("pannello.example.com")),
+            "spento: nessun dominio"
+        );
+        gate.set(Some("pannello.example.com".into()));
+        assert!(gate.is_admin(&req("pannello.example.com")));
+        assert!(
+            gate.is_admin(&req("Pannello.Example.com:8443")),
+            "maiuscole e porta non contano"
+        );
+        assert!(!gate.is_admin(&req("altro.example.com")));
+        assert!(
+            !gate.is_admin(&req("pannello.example.com.evil.it")),
+            "niente corrispondenze parziali"
+        );
+        assert!(!gate.is_admin(&req("x.pannello.example.com")));
+        let no_host = Request::builder().uri("/x").body(()).unwrap();
+        assert!(!gate.is_admin(&no_host));
+        gate.set(None);
+        assert!(!gate.is_admin(&req("pannello.example.com")));
+    }
 
     /// Ogni route dichiarata nel codice deve comparire nella tabella dei permessi:
     /// un endpoint dimenticato resterebbe senza controllo degli scope.

@@ -31,6 +31,7 @@ const ACTION_LABEL: Record<string, string> = {
   "rule.options": "Opzioni dell’instradamento",
   "link.create": "Link firmato creato",
   "link.rotate": "Chiave dei link ruotata",
+  "admin.host": "Pannello in HTTPS",
   "https.update": "HTTPS automatico modificato",
   "cert.issue": "Certificato richiesto",
   "cert.upload": "Certificato caricato",

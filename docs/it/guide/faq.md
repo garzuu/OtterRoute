@@ -28,7 +28,7 @@ Aumenta `cache_generation` nella destinazione; le copie vecchie non vengono più
 Ogni nodo è indipendente, con la propria cache e il proprio pannello. Non c'è un controller condiviso.
 
 **Posso esporre il pannello su Internet?**
-Sconsigliato. Ascolta su `127.0.0.1:9090`; usa un tunnel SSH o una VPN. → [Sicurezza](./security)
+Di default no: ascolta su `127.0.0.1:9090`, usa un tunnel SSH o una VPN. Se vuoi usarlo da browser puoi servirlo in HTTPS su un dominio dedicato, con la 2FA obbligatoria. → [Pannello in HTTPS](./panel-https), [Sicurezza](./security)
 
 **Come si aggiorna?**
 Backup, poi sostituisci binario o immagine. → [Aggiornamenti e backup](./upgrades-backup)

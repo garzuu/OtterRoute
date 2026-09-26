@@ -185,6 +185,15 @@ async fn main() -> anyhow::Result<()> {
         state.node_id.clone(),
         args.public_url.clone().filter(|u| !u.is_empty()),
     ));
+    // il pannello anche in HTTPS su un dominio del nodo (se attivato e con certificato)
+    let gate = Arc::new(admin::AdminGate::default());
+    gate.set(
+        panel_now
+            .settings
+            .admin_host
+            .clone()
+            .filter(|h| tls_state.store.has(h)),
+    );
     let admin_ctx = Arc::new(admin::Admin {
         state: state.clone(),
         config_path: args.config.clone(),
@@ -199,8 +208,10 @@ async fn main() -> anyhow::Result<()> {
         auth: auth::Auth::new(&args.state_dir),
         notifier: notifier.clone(),
         acme: acme.clone(),
+        gate: gate.clone(),
     });
     tokio::spawn(acme.clone().run());
+    let admin_pub = admin_ctx.clone();
     tokio::spawn(notify::run(notifier));
     tokio::spawn(admin::recheck_loop(admin_ctx.clone()));
     tokio::spawn(metrics::flush_loop(metrics.clone(), metrics_file.clone()));
@@ -213,7 +224,28 @@ async fn main() -> anyhow::Result<()> {
         .context("bind pubblico")?;
     tracing::info!(addr = %args.listen, "gateway in ascolto");
     let st = state.clone();
-    let server = serve(public, move |req| handler::handle(st.clone(), req, false));
+    let (gate_http, tls_http) = (gate.clone(), tls_state.clone());
+    let server = serve(public, move |req| {
+        let (st, gate, tls) = (st.clone(), gate_http.clone(), tls_http.clone());
+        async move {
+            // il pannello non si serve mai in HTTP: redirect a HTTPS (le sfide ACME e la
+            // verifica del dominio restano in HTTP)
+            if gate.is_admin(&req) && !req.uri().path().starts_with("/.well-known/") {
+                let host = gate.get().unwrap_or_default();
+                let pq = req
+                    .uri()
+                    .path_and_query()
+                    .map_or("/", http::uri::PathAndQuery::as_str);
+                let mut r = Response::new(body::full(""));
+                *r.status_mut() = http::StatusCode::PERMANENT_REDIRECT;
+                if let Ok(v) = http::HeaderValue::from_str(&tls.https_location(&host, pq)) {
+                    r.headers_mut().insert(http::header::LOCATION, v);
+                }
+                return Ok(r);
+            }
+            handler::handle(st, req, false).await
+        }
+    });
 
     // HTTPS: un errore di bind non ferma il nodo (la porta 443 può servire privilegi)
     if !args.https_listen.trim().is_empty() {
@@ -226,8 +258,16 @@ async fn main() -> anyhow::Result<()> {
                     tracing::info!(addr = %addr, "HTTPS in ascolto");
                     tls_state.set_listening(true);
                     let st = state.clone();
+                    let (gate, adm) = (gate.clone(), admin_pub.clone());
                     tokio::spawn(tls::serve(l, acceptor, move |req| {
-                        handler::handle(st.clone(), req, true)
+                        let (st, gate, adm) = (st.clone(), gate.clone(), adm.clone());
+                        async move {
+                            if gate.is_admin(&req) {
+                                admin::handle_secure(adm, req).await
+                            } else {
+                                handler::handle(st, req, true).await
+                            }
+                        }
                     }));
                 }
                 Err(e) => {

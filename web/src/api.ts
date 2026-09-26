@@ -170,7 +170,7 @@ export interface PanelState {
   recheck_minutes: number;
   recheck_verified_minutes: number;
   panel: {
-    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings };
+    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings; admin_host: string | null };
     domains: DomainInfo[];
     buckets: BucketInfo[];
     rules: RuleInfo[];
@@ -358,6 +358,8 @@ export const api = {
 
   addRule: (r: { domain: string; path_prefix: string; bucket_id: string; folder: string }) =>
     post<RuleInfo>("/api/rules", r),
+  setAdminHost: (host: string | null) =>
+    request<{ host: string | null; url: string | null; warnings: string[] }>("/api/admin-host", "PUT", { host }),
   saveHttps: (b: AcmeSettings) => request<AcmeSettings>("/api/https", "PUT", b),
   issueCert: (host: string) => post<{ started: boolean }>("/api/certs/issue", { host }),
   uploadCert: (host: string, chain: string, key: string) =>
