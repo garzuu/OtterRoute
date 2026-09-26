@@ -17,7 +17,7 @@ COPY docs/package.json docs/package-lock.json ./
 RUN npm ci
 COPY docs ./
 # la guida offline vive sotto /docs/ della porta di amministrazione
-RUN DOCS_BASE=/docs/ npx vitepress build
+RUN DOCS_BASE=/docs/ DOCS_LAST_UPDATED=0 npx vitepress build
 
 FROM debian:bookworm-slim
 RUN apt-get update \
