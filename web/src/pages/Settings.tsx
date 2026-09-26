@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, type PanelState } from "../api";
 import { loc } from "../i18n";
 import { useAuth, needScope } from "../auth";
+import { rich, tr } from "../i18n";
 import { Field, Page } from "../ui";
 import { BackupCard } from "./BackupCard";
 import type { AcmeSettings } from "../api";
@@ -22,7 +23,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
 
   const parse = (v: string): number => {
     const n = Number(v);
-    if (!Number.isInteger(n) || n < 1 || n > 65535) throw new Error("Porta non valida (1–65535).");
+    if (!Number.isInteger(n) || n < 1 || n > 65535) throw new Error(tr("st.badPort"));
     return n;
   };
 
@@ -32,7 +33,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
     try {
       await api.saveSettings(parse(h), parse(s));
       await refresh();
-      setMsg({ ok: true, text: "Salvato. Ricontrolla i domini per aggiornare lo stato." });
+      setMsg({ ok: true, text: tr("st.saved") });
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -57,7 +58,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
     try {
       await api.saveHttps(acme);
       await refresh();
-      setAcmeMsg({ ok: true, text: acme.enabled ? "Salvato. Il nodo sta ottenendo i certificati: lo stato compare in Domini." : "Salvato: i certificati automatici sono spenti." });
+      setAcmeMsg({ ok: true, text: acme.enabled ? tr("st.acmeOn") : tr("st.acmeOff") });
     } catch (e) {
       setAcmeMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -81,7 +82,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
       await refresh();
       setAdminMsg({
         ok: true,
-        text: host ? `Attivo: apri ${r.url}${r.warnings.length ? ` — Attenzione: ${r.warnings.join(" ")}` : ""}` : "Disattivato: il pannello resta solo sulla porta locale.",
+        text: host ? `${tr("st.adminOn", { url: r.url ?? "" })}${r.warnings.length ? tr("st.adminWarn", { w: r.warnings.join(" ") }) : ""}` : tr("st.adminOff"),
       });
     } catch (e) {
       setAdminMsg({ ok: false, text: (e as Error).message });
@@ -98,7 +99,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
       const r = await api.setAdminAllow(allowText.split(/[\s,]+/).filter(Boolean));
       await refresh();
       setAllowText(r.list.join("\n"));
-      setAdminMsg({ ok: true, text: r.list.length ? "Indirizzi ammessi salvati." : "Nessuna restrizione: il pannello in HTTPS è aperto a tutti gli indirizzi." });
+      setAdminMsg({ ok: true, text: r.list.length ? tr("st.allowSaved") : tr("st.allowNone") });
     } catch (e) {
       setAdminMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -110,7 +111,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
   const [upBusy, setUpBusy] = useState(false);
   const [upMsg, setUpMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const upd = state.panel.settings.updates;
-  const setWin = (w: { window_start?: number; window_end?: number }) => runUp(() => api.saveUpdates({ ...upd, ...w }), "Salvato.");
+  const setWin = (w: { window_start?: number; window_end?: number }) => runUp(() => api.saveUpdates({ ...upd, ...w }), tr("st.savedShort"));
   const runUp = async (fn: () => Promise<unknown>, okText: string) => {
     setUpBusy(true);
     setUpMsg(null);
@@ -134,14 +135,14 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
       setUpBusy(false);
       return;
     }
-    setUpMsg({ ok: true, text: "Aggiornamento in corso…" });
+    setUpMsg({ ok: true, text: tr("st.upRunning") });
     // si segue lo stato reale: errore (resta com'è), riavvio (il nodo cade e torna) o completamento
     const started = Date.now();
     let wasDown = false;
     const poll = setInterval(async () => {
       try {
         const r = await fetch("/api/panel");
-        if (!r.ok) throw new Error("non disponibile");
+        if (!r.ok) throw new Error(tr("st.notAvailable"));
         const p = (await r.json()) as PanelState;
         if (wasDown || p.update.current !== up.current) {
           clearInterval(poll);
@@ -152,110 +153,106 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
           setUpBusy(false);
           await refresh();
         } else if (p.update.apply.running) {
-          setUpMsg({ ok: true, text: `Aggiornamento in corso: ${p.update.apply.step}…` });
+          setUpMsg({ ok: true, text: tr("st.upStep", { step: p.update.apply.step }) });
         } else if (Date.now() - started > 60000) {
           clearInterval(poll);
           setUpBusy(false);
         }
       } catch {
         wasDown = true; // il nodo si sta riavviando: alla prima risposta si ricarica
-        setUpMsg({ ok: true, text: "Il nodo si sta riavviando con la nuova versione…" });
+        setUpMsg({ ok: true, text: tr("st.upRestart") });
       }
     }, 1500);
   };
   const HOW: Record<string, string> = {
-    docker: "docker pull ghcr.io/garzuu/otterroute:" + (up.latest?.version ?? "VERSIONE") + "\ndocker stop otterroute && docker rm otterroute\n# rilancia lo STESSO comando run, con lo stesso volume /data",
-    service: "Scarica la release per la tua piattaforma dalla pagina delle release, sostituisci l’eseguibile e riavvia il servizio (systemctl restart otterroute).",
-    binary: "Scarica la release per la tua piattaforma dalla pagina delle release, sostituisci l’eseguibile e riavvia il nodo.",
+    docker: tr("st.howDocker", { v: up.latest?.version ?? tr("st.version") }),
+    service: tr("st.howService"),
+    binary: tr("st.howBinary"),
     source: "git pull && cargo build --release && (cd web && npm ci && npm run build)",
   };
 
   return (
-    <Page title="Impostazioni" lead="Le porte standard del nodo. Cambiale solo se il tuo ambiente lo richiede.">
+    <Page title={tr("st.title")} lead={tr("st.lead")}>
       <div className="card">
-        <h2>Porte</h2>
+        <h2>{tr("st.ports")}</h2>
         <div className="row">
-          <Field label="HTTP" hint="Traffico pubblico dei domini. È la porta usata per verificare che i domini arrivino al nodo.">
+          <Field label="HTTP" hint={tr("st.httpHint")}>
             <input value={http} onChange={(e) => setHttp(e.target.value.replace(/\D/g, ""))} inputMode="numeric" disabled={!canWrite} />
           </Field>
-          <Field label="HTTPS" hint="In arrivo: per ora non è ancora servito.">
+          <Field label="HTTPS" hint={tr("st.httpsHint")}>
             <input value={https} onChange={(e) => setHttps(e.target.value.replace(/\D/g, ""))} inputMode="numeric" disabled={!canWrite} />
           </Field>
         </div>
-        <Field label="Pannello" hint="Solo su localhost, non va mai esposto. Si cambia all’avvio con OTR_ADMIN_LISTEN.">
+        <Field label={tr("st.panel")} hint={tr("st.panelHint")}>
           <input value="9090" disabled />
         </Field>
         {state.listen_port !== state.http_port && (
-          <div className="box warn">
-            Il nodo è in ascolto sulla porta <code>{state.listen_port}</code> (<code>OTR_LISTEN</code>), ma i domini vengono
-            verificati sulla <code>{state.http_port}</code>. Va bene se un proxy o il port forwarding inoltra l’una all’altra;
-            altrimenti allineale.
-          </div>
+          <div className="box warn">{rich(tr("st.portMismatch", { listen: state.listen_port, http: state.http_port }))}</div>
         )}
-        {!canWrite && <div className="box">Sola lettura: per modificare le impostazioni serve lo scope <code>settings:write</code>.</div>}
+        {!canWrite && <div className="box">{rich(tr("st.readOnly"))}</div>}
         {msg && <div className={`box ${msg.ok ? "good" : "bad"}`}>{msg.text}</div>}
         <div className="nav">
           {custom ? (
             <button className="ghost" onClick={restore} disabled={busy || !canWrite}>
-              Ripristina 80 / 443
+              {tr("st.restoreDefaults")}
             </button>
           ) : (
             <span />
           )}
           <button className="primary" onClick={() => save(http, https)} disabled={busy || !dirty || !canWrite} title={canWrite ? undefined : needScope("settings:write")}>
-            {busy ? "Salvo…" : "Salva"}
+            {busy ? tr("common.saving") : tr("common.save")}
           </button>
         </div>
       </div>
       <div className="card">
-        <h2>HTTPS automatico</h2>
+        <h2>{tr("st.acmeTitle")}</h2>
         <p className="muted">
-          Il nodo ottiene e rinnova da solo un certificato gratuito (Let’s Encrypt, sfida HTTP-01) per ogni dominio verificato. Serve che il dominio arrivi a questo nodo sulla porta 80 <strong>da Internet</strong>: dietro un proxy o una CDN il certificato si gestisce lì.
+          {rich(tr("st.acmeLead"))}
         </p>
         {!state.https_listening && (
           <div className="box warn">
-            Il nodo non è in ascolto per HTTPS (porta 443 non disponibile o <code>OTR_HTTPS_LISTEN</code> vuoto): i certificati si ottengono comunque, ma non si servono.
+            {rich(tr("st.noHttpsListen"))}
           </div>
         )}
         <label className="check">
           <input type="checkbox" checked={acme.enabled} onChange={(e) => setAcme({ ...acme, enabled: e.target.checked })} disabled={!canWrite} />
-          <span>Ottieni e rinnova i certificati in automatico. Attivandolo accetti i termini di servizio della CA (Let’s Encrypt).</span>
+          <span>{tr("st.acmeCheck")}</span>
         </label>
         <div className="row">
-          <Field label="Email di contatto" hint="Facoltativa: la CA la usa per avvisarti di scadenze e problemi.">
+          <Field label={tr("st.acmeEmail")} hint={tr("st.acmeEmailHint")}>
             <input value={acme.email} onChange={(e) => setAcme({ ...acme, email: e.target.value })} placeholder="nome@example.com" disabled={!canWrite} />
           </Field>
         </div>
         <label className="check">
           <input type="checkbox" checked={acme.staging} onChange={(e) => setAcme({ ...acme, staging: e.target.checked })} disabled={!canWrite} />
-          <span>Usa l’ambiente di prova (staging): i certificati non sono validi nei browser, ma non hai limiti di richieste. Utile per provare.</span>
+          <span>{tr("st.staging")}</span>
         </label>
         {acmeMsg && <div className={`box ${acmeMsg.ok ? "good" : "bad"}`}>{acmeMsg.text}</div>}
         <div className="nav">
           <span />
           <button className="primary" onClick={saveAcme} disabled={acmeBusy || !acmeDirty || !canWrite} title={canWrite ? undefined : needScope("settings:write")}>
-            {acmeBusy ? "Salvo…" : "Salva"}
+            {acmeBusy ? tr("common.saving") : tr("common.save")}
           </button>
         </div>
       </div>
       <div className="card">
-        <h2>Pannello in HTTPS</h2>
+        <h2>{tr("st.adminTitle")}</h2>
         <p className="muted">
-          Di norma il pannello risponde solo sulla porta locale (<code>127.0.0.1:9090</code>). Qui puoi servirlo anche in <strong>HTTPS</strong> su un dominio di questo nodo, con il suo certificato, per usarlo da browser senza tunnel. Il dominio deve avere un certificato in uso e non servire file.
+          {rich(tr("st.adminLead"))}
         </p>
         <div className="box warn">
-          Il pannello diventa raggiungibile da Internet: proteggilo con password lunghe e con la verifica in due passaggi obbligatoria (Utenti → Sicurezza). Con Cloudflare usa SSL <strong>Full</strong>, non Flexible.
+          {rich(tr("st.adminWarn2"))}
         </div>
         {adminHost ? (
           <p>
-            Attivo su <code>{adminHost}</code>. L’HTTP di quel dominio reindirizza a HTTPS.
+            {rich(tr("st.adminActive", { host: adminHost }))}
           </p>
         ) : eligible.length === 0 ? (
-          <p className="muted">Nessun dominio adatto: serve un dominio con un certificato in uso (Domini → HTTPS) e senza instradamenti.</p>
+          <p className="muted">{tr("st.noEligible")}</p>
         ) : (
-          <Field label="Dominio del pannello">
+          <Field label={tr("st.adminDomain")}>
             <select value={pick} onChange={(e) => setPick(e.target.value)} disabled={!canWrite}>
-              <option value="">Scegli un dominio…</option>
+              <option value="">{tr("st.pickDomain")}</option>
               {eligible.map((d) => (
                 <option key={d.host} value={d.host}>
                   {d.host}
@@ -265,15 +262,15 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
           </Field>
         )}
         {adminHost && (
-          <Field label="Indirizzi ammessi (facoltativo)">
+          <Field label={tr("st.allowLabel")}>
             <textarea rows={3} value={allowText} onChange={(e) => setAllowText(e.target.value)} disabled={!canWrite} placeholder={"203.0.113.7\n10.0.0.0/8\n2001:db8::/32"} />
             <span className="muted small-text">
-              Un IP o una rete CIDR per riga. Vuoto = tutti. Gli altri ricevono 404; la porta locale resta sempre aperta. Dietro Cloudflare vedresti gli IP di Cloudflare, non quelli dei visitatori.
+              {tr("st.allowHint")}
             </span>
             <div className="nav">
               <span />
               <button className="secondary" onClick={saveAllow} disabled={adminBusy || !canWrite}>
-                Salva elenco
+                {tr("st.saveList")}
               </button>
             </div>
           </Field>
@@ -283,86 +280,86 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
           <span />
           {adminHost ? (
             <button className="secondary" onClick={() => setAdmin(null)} disabled={adminBusy || !canWrite}>
-              Disattiva
+              {tr("common.disable")}
             </button>
           ) : (
             <button className="primary" onClick={() => setAdmin(pick)} disabled={adminBusy || !pick || !canWrite} title={canWrite ? undefined : needScope("settings:write")}>
-              Attiva
+              {tr("st.turnOn")}
             </button>
           )}
         </div>
       </div>
       <div className="card">
-        <h2>Aggiornamenti</h2>
+        <h2>{tr("st.upTitle")}</h2>
         <p>
-          Versione in uso: <code>{up.current}</code> · installazione: <strong>{{ docker: "Docker", service: "servizio", binary: "binario", source: "sorgenti" }[up.kind]}</strong>
+          {rich(tr("st.inUse", { v: up.current, kind: tr(({ docker: "st.kDocker", service: "st.kService", binary: "st.kBinary", source: "st.kSource" } as const)[up.kind]) }))}
         </p>
         {up.available && up.latest ? (
           <div className="box warn">
-            <strong>È disponibile la versione {up.latest.version}.</strong>{" "}
+            <strong>{tr("st.available", { v: up.latest.version })}</strong>{" "}
             <a href={up.latest.url} target="_blank" rel="noreferrer">
-              Note della release ↗
+              {tr("st.notes")}
             </a>
             {up.latest.notes && <pre className="small-text" style={{ whiteSpace: "pre-wrap", margin: "8px 0 0" }}>{up.latest.notes}</pre>}
             <div className="small-text" style={{ marginTop: 8 }}>
-              <strong>{up.can_self_update ? "Oppure a mano:" : "Come aggiornare:"}</strong>
+              <strong>{up.can_self_update ? tr("st.orByHand") : tr("st.howTo")}</strong>
               <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{HOW[up.kind]}</pre>
-              Prima fai un backup della cartella di stato. Le sessioni di accesso si perdono al riavvio.
+              {tr("st.backupFirst")}
             </div>
             {up.can_self_update ? (
               <div className="nav" style={{ marginTop: 10 }}>
                 <span className="muted small-text">
-                  Scarica il pacchetto, ne verifica checksum e firma, lo prova, salva un backup e riavvia il nodo; se non parte bene torna alla versione precedente.
+                  {tr("st.selfExplain")}
                 </span>
                 <button className="primary" onClick={applyNow} disabled={upBusy || up.apply.running || !canWrite}>
-                  {up.apply.running ? `In corso: ${up.apply.step}…` : "Aggiorna ora"}
+                  {up.apply.running ? tr("st.inProgress", { step: up.apply.step }) : tr("st.updateNow")}
                 </button>
               </div>
             ) : (
-              up.self_update_blocked && <div className="muted small-text" style={{ marginTop: 8 }}>Aggiornamento automatico non disponibile: {up.self_update_blocked}.</div>
+              up.self_update_blocked && <div className="muted small-text" style={{ marginTop: 8 }}>{tr("st.blocked", { why: up.self_update_blocked })}</div>
             )}
             {up.apply.error && !upMsg && <div className="box bad" style={{ marginTop: 8 }}>{up.apply.error}</div>}
           </div>
         ) : (
-          <div className="box good">{up.checked_at ? "Sei alla versione più recente." : "Ancora nessun controllo."}</div>
+          <div className="box good">{up.checked_at ? tr("st.latest") : tr("st.noCheck")}</div>
         )}
-        {up.error && <div className="box bad">Ultimo controllo non riuscito: {up.error}</div>}
-        {up.checked_at > 0 && <p className="muted small-text">Ultimo controllo: {new Date(up.checked_at * 1000).toLocaleString(loc())}</p>}
-        {up.env_disabled && <div className="box">Il controllo è disattivato da <code>OTR_UPDATE_CHECK=off</code>: il nodo non contatta GitHub.</div>}
+        {up.error && <div className="box bad">{tr("st.lastFail", { e: up.error })}</div>}
+        {up.checked_at > 0 && <p className="muted small-text">{tr("st.lastCheck", { date: new Date(up.checked_at * 1000).toLocaleString(loc()) })}</p>}
+        {up.env_disabled && <div className="box">{rich(tr("st.envOff"))}</div>}
         <label className="check">
-          <input type="checkbox" checked={upd.check} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, check: e.target.checked }), "Salvato.")} />
-          <span>Cerca ogni giorno le nuove versioni (una richiesta alle release pubbliche di GitHub, senza inviare dati del nodo).</span>
+          <input type="checkbox" checked={upd.check} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, check: e.target.checked }), tr("st.savedShort"))} />
+          <span>{tr("st.dailyCheck")}</span>
         </label>
         <label className="check">
-          <input type="checkbox" checked={upd.prerelease} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, prerelease: e.target.checked }), "Salvato.")} />
-          <span>Proponi anche le versioni di prova (pre-release).</span>
+          <input type="checkbox" checked={upd.prerelease} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, prerelease: e.target.checked }), tr("st.savedShort"))} />
+          <span>{tr("st.pre")}</span>
         </label>
         {up.can_self_update && (
           <>
             <label className="check">
-              <input type="checkbox" checked={upd.auto} disabled={!canWrite || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, auto: e.target.checked }), "Salvato.")} />
+              <input type="checkbox" checked={upd.auto} disabled={!canWrite || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, auto: e.target.checked }), tr("st.savedShort"))} />
               <span>
-                Applica da solo le versioni di <strong>correzione</strong> (es. 0.1.x) dalle <strong>{String(upd.window_start).padStart(2, "0")}:00</strong> alle <strong>{String(upd.window_end).padStart(2, "0")}:00</strong> (ora del nodo). Le versioni minori e maggiori restano manuali.
+                {rich(tr("st.auto", { from: String(upd.window_start).padStart(2, "0"), to: String(upd.window_end).padStart(2, "0") }))}
               </span>
             </label>
             {upd.auto && (
               <div className="row">
-                <Field label="Dalle ore">
+                <Field label={tr("st.fromHour")}>
                   <input value={String(upd.window_start)} inputMode="numeric" onChange={(e) => setWin({ window_start: Math.min(23, Number(e.target.value.replace(/\D/g, "") || 0)) })} />
                 </Field>
-                <Field label="Alle ore">
+                <Field label={tr("st.toHour")}>
                   <input value={String(upd.window_end)} inputMode="numeric" onChange={(e) => setWin({ window_end: Math.min(23, Number(e.target.value.replace(/\D/g, "") || 0)) })} />
                 </Field>
               </div>
             )}
           </>
         )}
-        {up.rollback && <div className="box warn">L’aggiornamento alla {up.rollback.to} è stato annullato: {up.rollback.reason}</div>}
+        {up.rollback && <div className="box warn">{tr("st.rolledBack", { to: up.rollback.to, reason: up.rollback.reason })}</div>}
         {upMsg && <div className={`box ${upMsg.ok ? "good" : "bad"}`}>{upMsg.text}</div>}
         <div className="nav">
           <span />
-          <button className="secondary" onClick={() => runUp(() => api.checkUpdate(), "Controllo eseguito.")} disabled={upBusy || !canWrite || up.env_disabled}>
-            {upBusy ? "Controllo…" : "Controlla ora"}
+          <button className="secondary" onClick={() => runUp(() => api.checkUpdate(), tr("st.checked"))} disabled={upBusy || !canWrite || up.env_disabled}>
+            {upBusy ? tr("bk2.checking") : tr("st.checkNow")}
           </button>
         </div>
       </div>
