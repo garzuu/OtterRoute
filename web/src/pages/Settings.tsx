@@ -111,24 +111,39 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
     setUpMsg(null);
     try {
       await api.applyUpdate();
-      setUpMsg({ ok: true, text: "Aggiornamento avviato: il nodo si riavvia da solo. Questa pagina si ricarica quando è tornato." });
-      // il pannello si riavvia con il nodo: si aspetta che risponda con la nuova versione
-      const started = Date.now();
-      const poll = setInterval(async () => {
-        try {
-          const r = await fetch("/api/session");
-          if (r.ok && Date.now() - started > 4000) {
-            clearInterval(poll);
-            window.location.reload();
-          }
-        } catch {
-          /* il nodo si sta riavviando */
-        }
-      }, 2000);
     } catch (e) {
       setUpMsg({ ok: false, text: (e as Error).message });
       setUpBusy(false);
+      return;
     }
+    setUpMsg({ ok: true, text: "Aggiornamento in corso…" });
+    // si segue lo stato reale: errore (resta com'è), riavvio (il nodo cade e torna) o completamento
+    const started = Date.now();
+    let wasDown = false;
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch("/api/panel");
+        if (!r.ok) throw new Error("non disponibile");
+        const p = (await r.json()) as PanelState;
+        if (wasDown || p.update.current !== up.current) {
+          clearInterval(poll);
+          window.location.reload();
+        } else if (!p.update.apply.running && p.update.apply.error) {
+          clearInterval(poll);
+          setUpMsg({ ok: false, text: p.update.apply.error });
+          setUpBusy(false);
+          await refresh();
+        } else if (p.update.apply.running) {
+          setUpMsg({ ok: true, text: `Aggiornamento in corso: ${p.update.apply.step}…` });
+        } else if (Date.now() - started > 60000) {
+          clearInterval(poll);
+          setUpBusy(false);
+        }
+      } catch {
+        wasDown = true; // il nodo si sta riavviando: alla prima risposta si ricarica
+        setUpMsg({ ok: true, text: "Il nodo si sta riavviando con la nuova versione…" });
+      }
+    }, 1500);
   };
   const HOW: Record<string, string> = {
     docker: "docker pull ghcr.io/garzuu/otterroute:" + (up.latest?.version ?? "VERSIONE") + "\ndocker stop otterroute && docker rm otterroute\n# rilancia lo STESSO comando run, con lo stesso volume /data",
@@ -258,7 +273,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
             </a>
             {up.latest.notes && <pre className="small-text" style={{ whiteSpace: "pre-wrap", margin: "8px 0 0" }}>{up.latest.notes}</pre>}
             <div className="small-text" style={{ marginTop: 8 }}>
-              <strong>Come aggiornare:</strong>
+              <strong>{up.can_self_update ? "Oppure a mano:" : "Come aggiornare:"}</strong>
               <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{HOW[up.kind]}</pre>
               Prima fai un backup della cartella di stato. Le sessioni di accesso si perdono al riavvio.
             </div>
@@ -274,7 +289,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
             ) : (
               up.self_update_blocked && <div className="muted small-text" style={{ marginTop: 8 }}>Aggiornamento automatico non disponibile: {up.self_update_blocked}.</div>
             )}
-            {up.apply.error && <div className="box bad" style={{ marginTop: 8 }}>{up.apply.error}</div>}
+            {up.apply.error && !upMsg && <div className="box bad" style={{ marginTop: 8 }}>{up.apply.error}</div>}
           </div>
         ) : (
           <div className="box good">{up.checked_at ? "Sei alla versione più recente." : "Ancora nessun controllo."}</div>
