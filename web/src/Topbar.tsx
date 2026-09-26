@@ -74,6 +74,7 @@ const HELP: Record<PageId, [string, string][]> = {
   ],
   settings: [
     ["Aggiornamenti", "guide/upgrades-backup#aggiornare"],
+    ["Backup e ripristino", "guide/upgrades-backup#backup-dal-pannello"],
     ["Porte standard", "guide/install#porte-standard"],
     ["Variabili d'ambiente", "reference/environment"],
     ["HTTPS e proxy", "guide/https-proxy"],

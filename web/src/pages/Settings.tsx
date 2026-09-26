@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, type PanelState } from "../api";
 import { useAuth, needScope } from "../auth";
 import { Field, Page } from "../ui";
+import { BackupCard } from "./BackupCard";
 import type { AcmeSettings } from "../api";
 
 const DEFAULTS = { http: 80, https: 443 };
@@ -364,6 +365,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
           </button>
         </div>
       </div>
+      <BackupCard />
     </Page>
   );
 }

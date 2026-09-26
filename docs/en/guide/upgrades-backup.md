@@ -33,7 +33,19 @@ chmod 600 otterroute-state-*.tgz
 
 The backup contains keys and hashes: keep it encrypted and with restricted permissions.
 
-## Restoring
+## Backup from the panel
+
+**Settings → Backup and restore** produces a single `.otrbak` file with users (password hashes), bucket keys, certificates, domains, routes, notifications and the node identity; the cache is not included. The file is **encrypted** (AES-256-GCM, key derived from your passphrase with Argon2id): choose a passphrase of at least 12 characters and keep it **apart** from the file. Without it nothing can be recovered. It needs the `users:manage` scope (Administrator by default).
+
+To restore, pick the file, enter the passphrase and press *Check the file*: the node shows the backup's version and date without changing anything. Then *Restore now*:
+
+- the current state is copied to `state/backups/pre-restore/` (a single copy: the next restore replaces it);
+- the node refuses backups made by a **newer version** (upgrade the node first) or with an unknown format; backups from older versions are accepted;
+- the node **restarts** (same process) and sessions are lost: sign in with the credentials from the backup.
+
+A restore replaces everything, including the node identity, so it also **moves** a node to another server. After moving, update DNS and, if the node has a new address, recheck the domains.
+
+## Restoring by hand
 
 1. Stop the node.
 2. Restore the state folder (and `config.yaml`) with the same permissions.

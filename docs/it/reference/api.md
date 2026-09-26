@@ -34,7 +34,7 @@ Autenticazione: cookie di sessione ottenuto con `POST /api/login`. Le richieste 
 | `PUT /api/rules/{id}` (link firmati e immagini al volo), `POST /api/links` | `routes:write` |
 | `POST /api/links/rotate` | `settings:write` |
 | `POST /api/diagnose` | `routes:read` |
-| `/api/users`, `/api/audit`, `/api/policy` | `users:manage` |
+| `/api/users`, `/api/audit`, `/api/policy`, `POST /api/backup/export`, `POST /api/backup/restore` | `users:manage` |
 | `GET/PUT /api/notifications`, `POST /api/notifications/test` | `notifications:manage` |
 | `/api/me`, `/api/me/password`, `/api/me/2fa/…` | — |
 

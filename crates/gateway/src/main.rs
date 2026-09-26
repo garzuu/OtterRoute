@@ -4,6 +4,7 @@ mod admin_users;
 mod allow;
 mod audit;
 mod auth;
+mod backup;
 mod body;
 mod cache;
 mod config;

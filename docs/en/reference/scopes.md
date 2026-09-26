@@ -46,6 +46,6 @@ A scope `x:write` always includes `x:read`.
 | `PUT /api/rules/{id}`, `POST /api/links` | `routes:write` |
 | `POST /api/links/rotate` | `settings:write` |
 | `POST /api/diagnose` | `routes:read` |
-| `/api/users…`, `/api/audit`, `/api/policy` | `users:manage` |
+| `/api/users…`, `/api/audit`, `/api/policy`, `/api/backup/…` | `users:manage` |
 | `GET/PUT /api/notifications`, `POST /api/notifications/test` | `notifications:manage` |
 | `/api/me…` | none (logged-in user) |

@@ -30,7 +30,19 @@ chmod 600 otterroute-stato-*.tgz
 
 Il backup contiene chiavi e hash: conservalo cifrato e con permessi ristretti.
 
-## Ripristinare
+## Backup dal pannello
+
+**Impostazioni → Backup e ripristino** produce un unico file `.otrbak` con utenti (hash delle password), chiavi dei bucket, certificati, domini, instradamenti, notifiche e identità del nodo; non c'è la cache. Il file è **cifrato** (AES-256-GCM, chiave derivata dalla tua frase con Argon2id): scegli una frase di almeno 12 caratteri e conservala **separata** dal file. Senza la frase non si recupera nulla. Serve lo scope `users:manage` (di default solo l'Amministratore).
+
+Per ripristinare scegli il file, inserisci la frase e premi *Controlla il file*: il nodo mostra versione e data del backup senza cambiare nulla. Poi *Ripristina ora*:
+
+- lo stato attuale viene copiato in `state/backups/pre-restore/` (una sola copia: il ripristino successivo la sostituisce);
+- il nodo rifiuta backup creati da una **versione più recente** (aggiorna prima il nodo) o con formato sconosciuto; quelli di versioni precedenti sono accettati;
+- il nodo si **riavvia** (stesso processo) e le sessioni si perdono: accedi con le credenziali del backup.
+
+Il ripristino sostituisce tutto, compresa l'identità del nodo: serve anche per **spostare** il nodo su un altro server. Dopo lo spostamento aggiorna il DNS e, se il nodo ha un nuovo indirizzo, ricontrolla i domini.
+
+## Ripristinare a mano
 
 1. Ferma il nodo.
 2. Ripristina la cartella di stato (e `config.yaml`) con gli stessi permessi.
