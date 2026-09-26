@@ -20,5 +20,18 @@ for (const [k, v] of it) {
   if (en.get(k).trim() === "") { console.error(`vuota in en: ${k}`); bad++; }
 }
 for (const k of en.keys()) if (!it.has(k)) { console.error(`in più in en: ${k}`); bad++; }
-console.log(`${it.size} chiavi, ${bad} problemi`);
+// ogni messaggio statico del server (bad("…"), error(…, "…"), Err("…")) deve avere una chiave srv.* con lo stesso testo
+import { readdirSync } from "node:fs";
+const srvIt = new Set([...it].filter(([k]) => k.startsWith("srv.")).map(([, v]) => v));
+const dir = new URL("../../crates/gateway/src/", import.meta.url);
+const found = new Set();
+for (const f of readdirSync(dir).filter((x) => x.endsWith(".rs"))) {
+  const src = readFileSync(new URL(f, dir), "utf8");
+  for (const m of src.matchAll(/\b(?:bad|error)\((?:StatusCode::[A-Z_]+, )?"([^"\\]+)"/g)) found.add(m[1]);
+  if (["users.rs", "auth.rs", "admin_users.rs", "totp.rs", "admin.rs", "notify.rs"].includes(f))
+    for (const m of src.matchAll(/Err\((?:String::from\()?"([^"\\]+)"/g)) found.add(m[1]);
+}
+const SKIP = new Set(["not found"]);
+for (const m of found) if (!SKIP.has(m) && !srvIt.has(m)) { console.error(`messaggio del server senza traduzione (srv.*): ${m}`); bad++; }
+console.log(`${it.size} chiavi, ${found.size} messaggi del server, ${bad} problemi`);
 process.exit(bad ? 1 : 0);

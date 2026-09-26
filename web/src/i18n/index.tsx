@@ -27,6 +27,7 @@ if (typeof document !== "undefined") document.documentElement.lang = current;
 
 /** Formato di date e numeri della lingua in uso (per le funzioni fuori dai componenti). */
 export const loc = () => LOCALES[current];
+export const curLang = () => current;
 
 function fill(msg: string, p?: Params): string {
   return p ? msg.replace(/\{(\w+)\}/g, (m, k: string) => (k in p ? String(p[k]) : m)) : msg;
@@ -44,6 +45,18 @@ export function rich(text: string): ReactNode[] {
     if (!m) return part;
     return m[1] === "b" ? <strong key={i}>{m[2]}</strong> : <code key={i}>{m[2]}</code>;
   });
+}
+
+let serverKeys: Map<string, Key> | null = null;
+
+/** Messaggio arrivato dal server (scritto in italiano): se è noto lo traduce, altrimenti lo lascia com'è. */
+export function srv(text: string): string {
+  if (!serverKeys) {
+    serverKeys = new Map();
+    for (const k of Object.keys(it) as Key[]) if (k.startsWith("srv.")) serverKeys.set(it[k], k);
+  }
+  const k = serverKeys.get(text);
+  return k ? tr(k) : text;
 }
 
 /** Plurali: cerca `<chiave>.one` / `<chiave>.other` secondo la lingua; `{n}` è il numero. */

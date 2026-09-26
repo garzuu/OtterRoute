@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { ApiError } from "../api";
 import { useAuth, needScope } from "../auth";
-import { loc, tr } from "../i18n";
+import { loc, srv, tr } from "../i18n";
 import { Field } from "../ui";
 
 interface Manifest {
@@ -15,7 +15,7 @@ const HDR = { "X-OtterRoute-Restore": "1", "Content-Type": "application/octet-st
 
 async function fail(res: Response): Promise<never> {
   const d = await res.json().catch(() => ({}));
-  throw new ApiError(d.error ?? `Errore ${res.status}`, res.status);
+  throw new ApiError(d.error ? srv(d.error) : tr("common.errorN", { n: res.status }), res.status);
 }
 
 export function BackupCard() {
