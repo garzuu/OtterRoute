@@ -1,5 +1,8 @@
 ## [Non rilasciato]
 
+### Corretto
+- Guida: dietro Cloudflare (nuvola arancione) l'emissione ACME non «fallisce» sempre; riesce se la sfida non viene reindirizzata a HTTPS. Aggiunti i passi per farla passare.
+
 ### Aggiunto
 - **Backup e ripristino dal pannello**: un file `.otrbak` cifrato (AES-256-GCM, Argon2id) con utenti, chiavi, certificati e configurazione; ripristino con controllo preventivo, rifiuto di backup di versioni più recenti, copia dello stato precedente e riavvio del nodo. Scope `users:manage`.
 - **Notifiche** (email/Telegram) anche per nuove versioni, rollback di un aggiornamento e certificati in scadenza o scaduti, compresi quelli caricati a mano. Le notifiche di versione seguono l'interruttore del controllo aggiornamenti.

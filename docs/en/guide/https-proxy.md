@@ -4,7 +4,7 @@ source_commit: dd1d866
 # HTTPS and proxy
 
 ::: tip You only need a proxy in some cases
-OtterRoute can serve [HTTPS by itself](./https), with free certificates that renew automatically. A proxy or CDN in front makes sense if you already have one, if the domain goes through Cloudflare (the certificate challenge would not reach the node), if the node cannot listen on 443 or if you want a single entry point for several services. In that case the proxy terminates TLS and forwards traffic over HTTP to the node.
+OtterRoute can serve [HTTPS by itself](./https), with free certificates that renew automatically. A proxy or CDN in front makes sense if you already have one, if the domain goes through Cloudflare (the certificate challenge can work, but only if the proxy forwards it without redirecting it: see [Automatic HTTPS](./https)), if the node cannot listen on 443 or if you want a single entry point for several services. In that case the proxy terminates TLS and forwards traffic over HTTP to the node.
 :::
 
 ## Diagram

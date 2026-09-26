@@ -24,7 +24,7 @@ The state of each domain is in the **HTTPS** column of the *Domains* page: *Vali
 - **No wildcards** (`*.example.com`): with HTTP-01 each name has its own certificate. For a wildcard certificate obtain it elsewhere and upload it (see below).
 
 ::: warning Behind Cloudflare or another proxy
-If the domain points to a proxy (for example Cloudflare with the orange cloud), the challenge reaches the proxy and not the node: issuance fails. In that case leave certificates to the proxy and use [HTTPS and proxy](./https-proxy).
+If the domain points to a proxy (for example Cloudflare with the orange cloud), the challenge (HTTP-01, on port 80) goes through the proxy. It can succeed if the proxy forwards it to the node **without redirecting it to HTTPS**: on Cloudflare turn off *Always Use HTTPS* (or exclude `/.well-known/acme-challenge/*` with a rule), or set the record to **DNS only** (grey cloud) during issuance and turn the proxy back on afterwards. Other proxies or rules (WAF, country blocks) make it fail. If you would rather not depend on this, leave certificates to the proxy and use [HTTPS and proxy](./https-proxy), or upload an origin certificate from the proxy (see below). With Cloudflare on **Full (strict)** the node must have a valid certificate: the automatic one or an origin one.
 :::
 
 ## Trying it without limits: the staging environment
