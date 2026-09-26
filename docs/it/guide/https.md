@@ -21,7 +21,7 @@ Lo stato di ogni dominio è nella colonna **HTTPS** della pagina *Domini*: *Vali
 - **Niente jolly** (`*.example.com`): con HTTP-01 ogni nome ha il suo certificato. Per un certificato jolly ottienilo altrove e caricalo (vedi sotto).
 
 ::: warning Dietro Cloudflare o un altro proxy
-Se il dominio punta a un proxy (per esempio Cloudflare con la nuvola arancione), la sfida arriva al proxy e non al nodo: l'emissione fallisce. In quel caso lascia i certificati al proxy e usa [HTTPS e proxy](./https-proxy).
+Se il dominio punta a un proxy (per esempio Cloudflare con la nuvola arancione), la sfida (HTTP-01, sulla porta 80) passa dal proxy. Può riuscire se il proxy la inoltra al nodo **senza reindirizzarla a HTTPS**: su Cloudflare disattiva *Always Use HTTPS* (o escludi `/.well-known/acme-challenge/*` con una regola), oppure metti il record in **solo DNS** (nuvola grigia) durante l'emissione e riattivalo dopo. Altri proxy o regole (WAF, blocchi per paese) la fanno fallire. Se non vuoi dipendere da questo, lascia i certificati al proxy e usa [HTTPS e proxy](./https-proxy), oppure carica un certificato di origine del proxy (vedi sotto). Con Cloudflare in **Full (strict)** il nodo deve avere un certificato valido: quello automatico o uno di origine.
 :::
 
 ## Provare senza limiti: l'ambiente di staging

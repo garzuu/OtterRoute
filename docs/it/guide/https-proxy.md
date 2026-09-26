@@ -1,7 +1,7 @@
 # HTTPS e proxy
 
 ::: tip Ti serve un proxy solo in alcuni casi
-OtterRoute sa servire [HTTPS da solo](./https), con certificati gratuiti che si rinnovano in automatico. Un proxy o una CDN davanti ha senso se ce l'hai già, se il dominio passa da Cloudflare (la sfida dei certificati non arriverebbe al nodo), se il nodo non può ascoltare sulla 443 o se vuoi un unico punto di ingresso per più servizi. In quel caso il proxy termina TLS e inoltra il traffico in HTTP al nodo.
+OtterRoute sa servire [HTTPS da solo](./https), con certificati gratuiti che si rinnovano in automatico. Un proxy o una CDN davanti ha senso se ce l'hai già, se il dominio passa da Cloudflare (la sfida dei certificati può funzionare, ma solo se il proxy la inoltra senza reindirizzarla: vedi [HTTPS automatico](./https)), se il nodo non può ascoltare sulla 443 o se vuoi un unico punto di ingresso per più servizi. In quel caso il proxy termina TLS e inoltra il traffico in HTTP al nodo.
 :::
 
 ## Schema

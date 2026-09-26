@@ -60,7 +60,7 @@ Cerca il messaggio che vedi nel pannello o nella risposta. Se non lo trovi, la p
 
 | Sintomo | Cosa fare |
 |---|---|
-| Certificato in errore: *la CA non ha convalidato il dominio* | Il dominio deve arrivare a questo nodo sulla **porta 80 da Internet**; un firewall, un proxy o Cloudflare fanno fallire la sfida ([HTTPS automatico](./https)). |
+| Certificato in errore: *la CA non ha convalidato il dominio* | Il dominio deve arrivare a questo nodo sulla **porta 80 da Internet**; un firewall o un proxy la bloccano; con Cloudflare la sfida passa solo se non viene reindirizzata a HTTPS (*Always Use HTTPS*) o se metti il record in solo DNS durante l'emissione ([HTTPS automatico](./https)). |
 | Il browser dice «certificato non valido» ma il dominio è *Valido* | È attivo l'ambiente di **staging**: toglilo in Impostazioni → HTTPS. |
 | Il sito non si apre su HTTPS ma il certificato c'è | Il nodo non è in ascolto sulla 443 (porta occupata o permessi): guarda Impostazioni e il log; con Docker mappa `-p 443:443`. |
 | Dopo aver attivato il redirect il sito non si apre | Un proxy davanti reindirizza a sua volta in un ciclo: disattiva il redirect di uno dei due. |
