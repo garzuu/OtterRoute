@@ -2,6 +2,9 @@
 
 Il nodo può avvisarti **via email e Telegram** quando un dominio o un bucket smette di funzionare, e quando torna a posto. Così non serve tenere aperto il pannello. Si configurano da **Notifiche** nel menu (serve lo scope `notifications:manage`, di default solo l'Amministratore).
 
+![La pagina Notifiche: canali, soglie e regole](/screens/notifications.jpg)
+<p class="shot-caption">La pagina Notifiche: canali, soglie e regole · 26/09/2026</p>
+
 ## Cosa viene notificato
 
 Gli stessi avvisi della campanella del pannello:

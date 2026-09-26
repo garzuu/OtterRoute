@@ -30,3 +30,6 @@
 .sources { margin: 2rem 0 0; padding: 1rem 1.25rem; border: 1px solid var(--vp-c-divider); border-radius: 8px; background: var(--vp-c-bg-soft); font-size: 0.9rem; }
 .sources p { margin: 0 0 0.5rem; font-weight: 600; }
 .sources ul { margin: 0; padding-left: 1.2rem; }
+
+.vp-doc img[src*="screens/"] { width: 100%; border: 1px solid var(--vp-c-divider); border-radius: 10px; box-shadow: 0 6px 24px rgba(15, 37, 55, .08); margin: 18px 0 0; }
+.shot-caption { margin: 8px 0 20px; font-size: 13px; color: var(--vp-c-text-2); text-align: center; }

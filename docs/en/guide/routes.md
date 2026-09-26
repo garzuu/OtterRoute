@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 A route links a **domain + path prefix** to a **bucket + folder**. Create it from **Routes → New route** choosing among verified domains and existing buckets.
 
+![Active routes, with the row expanded](/screens/routes.jpg)
+<p class="shot-caption">Active routes, with the row expanded · 26/09/2026</p>
+
 ## How to read it
 
 | Field | Meaning |

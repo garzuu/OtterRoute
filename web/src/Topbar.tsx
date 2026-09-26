@@ -60,6 +60,12 @@ const HELP: Record<PageId, [string, string][]> = {
     ["La politica di cache", "guide/cache#la-politica-di-cache"],
     ["Problemi con file e 404", "guide/troubleshooting#instradamenti-e-file"],
   ],
+  diagnosis: [
+    ["Risoluzione dei problemi", "guide/troubleshooting"],
+    ["Cosa dice X-Cache", "guide/cache#cosa-dice-x-cache"],
+    ["Domini e DNS", "guide/domains-dns#cosa-controlla-la-verifica"],
+    ["Regole di scelta", "guide/routes#regole-di-scelta"],
+  ],
   notifications: [
     ["Cosa viene notificato", "guide/notifications#cosa-viene-notificato"],
     ["Configurare Telegram", "guide/notifications#telegram"],

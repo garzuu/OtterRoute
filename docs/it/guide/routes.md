@@ -2,6 +2,9 @@
 
 Un instradamento collega un **dominio + prefisso di percorso** a un **bucket + cartella**. Si crea da **Instradamenti → Nuovo instradamento** scegliendo tra i domini verificati e i bucket censiti.
 
+![Instradamenti attivi, con la riga espansa](/screens/routes.jpg)
+<p class="shot-caption">Instradamenti attivi, con la riga espansa · 26/09/2026</p>
+
 ## Come si legge
 
 | Campo | Significato |

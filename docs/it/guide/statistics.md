@@ -2,6 +2,9 @@
 
 Il nodo conta il traffico pubblico e lo mostra nella **Panoramica** del pannello; gli stessi contatori sono disponibili in formato Prometheus.
 
+![La Panoramica: richieste, cache hit, banda, errori e latenza](/screens/overview.jpg)
+<p class="shot-caption">La Panoramica: richieste, cache hit, banda, errori e latenza · 26/09/2026</p>
+
 ## Cosa si misura
 
 Per ogni richiesta pubblica:

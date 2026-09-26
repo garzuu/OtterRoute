@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api, type PanelState } from "./api";
 import { buildAlerts } from "./alerts";
 import { useAuth } from "./auth";
-import { IconBell, IconBuckets, IconDomains, IconOverview, IconRoutes, IconSettings, IconUsers } from "./icons";
+import { IconBell, IconBuckets, IconDiagnosis, IconDomains, IconOverview, IconRoutes, IconSettings, IconUsers } from "./icons";
 import { Topbar } from "./Topbar";
 import { Notifications } from "./pages/Notifications";
+import { Diagnosis } from "./pages/Diagnosis";
 import { Wizard } from "./Wizard";
 import type { Alert } from "./alerts";
 import { Overview } from "./pages/Overview";
@@ -16,7 +17,7 @@ import { Users } from "./pages/Users";
 import { Profile } from "./pages/Profile";
 import { canSetup } from "./setup";
 
-export type PageId = "overview" | "domains" | "buckets" | "routes" | "notifications" | "settings" | "users" | "profile";
+export type PageId = "overview" | "domains" | "buckets" | "routes" | "diagnosis" | "notifications" | "settings" | "users" | "profile";
 
 /** Voci della sidebar; `scope` è ciò che serve per vederle. */
 const NAV: { id: PageId; label: string; Icon: typeof IconOverview; scope?: string }[] = [
@@ -25,11 +26,12 @@ const NAV: { id: PageId; label: string; Icon: typeof IconOverview; scope?: strin
   { id: "buckets", label: "Bucket", Icon: IconBuckets, scope: "buckets:read" },
   { id: "routes", label: "Instradamenti", Icon: IconRoutes, scope: "routes:read" },
   { id: "users", label: "Utenti", Icon: IconUsers, scope: "users:manage" },
+  { id: "diagnosis", label: "Diagnosi", Icon: IconDiagnosis, scope: "routes:read" },
   { id: "notifications", label: "Notifiche", Icon: IconBell, scope: "notifications:manage" },
   { id: "settings", label: "Impostazioni", Icon: IconSettings },
 ];
 
-const PAGES: PageId[] = ["overview", "domains", "buckets", "routes", "notifications", "settings", "users", "profile"];
+const PAGES: PageId[] = ["overview", "domains", "buckets", "routes", "diagnosis", "notifications", "settings", "users", "profile"];
 
 /** La pagina indicata nell'indirizzo, solo se l'utente può vederla. */
 const pageFromHash = (can: (s: string) => boolean): PageId => {
@@ -179,6 +181,7 @@ export function Dashboard(props: { username: string; onLoggedOut: () => void; on
             {page === "domains" && <Domains state={state} refresh={refresh} />}
             {page === "buckets" && <Buckets state={state} refresh={refresh} />}
             {page === "routes" && <Routes state={state} refresh={refresh} go={go} />}
+            {page === "diagnosis" && can("routes:read") && <Diagnosis />}
             {page === "notifications" && can("notifications:manage") && <Notifications />}
             {page === "settings" && <Settings state={state} refresh={refresh} />}
             {page === "users" && can("users:manage") && <Users />}

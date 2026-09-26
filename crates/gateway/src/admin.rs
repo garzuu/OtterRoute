@@ -130,6 +130,8 @@ pub fn access(method: &Method, path: &str) -> Option<Access> {
         ("POST", "/api/rules") => Scope("routes:write"),
         ("DELETE", p) if p.starts_with("/api/rules/") => Scope("routes:write"),
         ("POST", "/api/probe") => Scope("routes:read"),
+        ("POST", "/api/purge" | "/api/warm") => Scope("routes:write"),
+        ("POST", "/api/diagnose") => Scope("routes:read"),
         (_, "/api/notifications" | "/api/notifications/test") => Scope("notifications:manage"),
         (_, "/api/users" | "/api/audit" | "/api/policy") => Scope("users:manage"),
         (_, p) if p.starts_with("/api/users/") => Scope("users:manage"),
@@ -218,6 +220,9 @@ async fn api(
         (&Method::POST, "/api/buckets") => with_body!(BucketReq, add_bucket),
         (&Method::POST, "/api/rules") => with_body!(RuleReq, add_rule),
         (&Method::POST, "/api/probe") => with_body!(ProbeReq, probe),
+        (&Method::POST, "/api/diagnose") => with_body!(DiagnoseReq, diagnose),
+        (&Method::POST, "/api/purge") => with_body!(PurgeReq, purge),
+        (&Method::POST, "/api/warm") => with_body!(WarmReq, warm),
         (&Method::GET, "/api/notifications") => notifications_get(admin),
         (&Method::PUT, "/api/notifications") => with_body!(NotifyReq, notifications_put),
         (&Method::POST, "/api/notifications/test") => with_body!(NotifyTestReq, notifications_test),
@@ -1437,6 +1442,7 @@ async fn add_rule(admin: &Admin, req: RuleReq) -> Response<Body> {
         path_prefix: prefix,
         bucket_id: req.bucket_id,
         folder,
+        cache_generation: 1,
     };
     p.rules.push(rule.clone());
     if let Err(e) = apply_config(admin, &p) {
@@ -1471,6 +1477,422 @@ async fn delete_rule(admin: &Admin, id: &str) -> Response<Body> {
     }
     audit::log("rule.delete", id);
     json(StatusCode::OK, json!({"ok": true}))
+}
+
+// ---------------------------------------------------------------------------
+// Svuotamento e precaricamento della cache
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct PurgeReq {
+    rule: String,
+    /// assente = tutto l'instradamento; altrimenti il percorso di un file, come lo chiede un visitatore
+    #[serde(default)]
+    path: Option<String>,
+}
+
+/// Percorso di un file così come lo chiede un visitatore: inizia con `/`, senza query.
+fn visitor_path(p: &str) -> Result<String, String> {
+    if !p.starts_with('/') || p.contains(['?', '#', ' ']) {
+        return Err("il percorso deve iniziare con / e non avere query".into());
+    }
+    crate::routing::normalize_path(p).map_err(|_| "percorso non valido".to_string())
+}
+
+async fn purge(admin: &Admin, req: PurgeReq) -> Response<Body> {
+    if let Some(path) = req.path.as_deref().filter(|p| !p.is_empty()) {
+        let path = match visitor_path(path) {
+            Ok(p) => p,
+            Err(e) => return bad(e),
+        };
+        let snap = admin.state.snapshot.load_full();
+        let Some(route) = snap
+            .routes_by_host
+            .values()
+            .flatten()
+            .find(|r| r.id == req.rule)
+        else {
+            return error(StatusCode::NOT_FOUND, "instradamento non trovato");
+        };
+        let Some(key) = route.object_key(&path) else {
+            return bad("il percorso non appartiene a questo instradamento");
+        };
+        let ck = crate::routing::cache_key(route, &key, "");
+        let existed = admin.state.cache.remove(&ck).await;
+        audit::log("cache.purge", &format!("{}{}", route.host, path));
+        return json(StatusCode::OK, json!({ "removed": u32::from(existed) }));
+    }
+    let _g = admin.write_lock.lock().await;
+    if let Err(r) = guard_hand_managed(admin) {
+        return r;
+    }
+    let mut p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let Some(rule) = p.rules.iter_mut().find(|r| r.id == req.rule) else {
+        return error(StatusCode::NOT_FOUND, "instradamento non trovato");
+    };
+    rule.cache_generation += 1;
+    let label = format!("{}{}", rule.domain, rule.path_prefix);
+    if let Err(e) = apply_config(admin, &p) {
+        return error(StatusCode::INTERNAL_SERVER_ERROR, e);
+    }
+    if let Err(r) = save_panel(admin, &p) {
+        return r;
+    }
+    audit::log("cache.purge", &format!("{label} (tutto)"));
+    json(StatusCode::OK, json!({ "all": true }))
+}
+
+#[derive(Deserialize)]
+struct WarmReq {
+    rule: String,
+    paths: Vec<String>,
+}
+
+const WARM_MAX_PATHS: usize = 200;
+const WARM_BUDGET: Duration = Duration::from_secs(120);
+
+/// Chiede al proprio listener i percorsi indicati, così la prima visita è già `HIT`.
+async fn warm(admin: &Admin, req: WarmReq) -> Response<Body> {
+    if req.paths.is_empty() || req.paths.len() > WARM_MAX_PATHS {
+        return bad(format!("indica da 1 a {WARM_MAX_PATHS} percorsi"));
+    }
+    let host = {
+        let snap = admin.state.snapshot.load_full();
+        match snap
+            .routes_by_host
+            .values()
+            .flatten()
+            .find(|r| r.id == req.rule)
+        {
+            Some(r) => r.host.clone(),
+            None => return error(StatusCode::NOT_FOUND, "instradamento non trovato"),
+        }
+    };
+    let client = match s3::build_client(true) {
+        Ok(c) => c,
+        Err(e) => return error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let started = Instant::now();
+    let mut results = Vec::new();
+    for raw in &req.paths {
+        let path = raw.trim();
+        if started.elapsed() > WARM_BUDGET {
+            results.push(json!({ "path": path, "status": null, "error": "non eseguito: tempo massimo raggiunto" }));
+            continue;
+        }
+        if let Err(e) = visitor_path(path) {
+            results.push(json!({ "path": path, "status": null, "error": e }));
+            continue;
+        }
+        let url = format!("http://127.0.0.1:{}{}", admin.listen_port, path);
+        let t0 = Instant::now();
+        let r = match client.get(&url).header(header::HOST, &host).send().await {
+            Ok(mut resp) => {
+                let status = resp.status().as_u16();
+                let x_cache = resp
+                    .headers()
+                    .get("x-cache")
+                    .and_then(|v| v.to_str().ok())
+                    .map(str::to_owned);
+                let mut bytes = 0u64;
+                let mut err = None;
+                loop {
+                    match resp.chunk().await {
+                        Ok(Some(c)) => bytes += c.len() as u64,
+                        Ok(None) => break,
+                        Err(e) => {
+                            err = Some(e.to_string());
+                            break;
+                        }
+                    }
+                }
+                json!({ "path": path, "status": status, "x_cache": x_cache, "bytes": bytes,
+                        "elapsed_ms": t0.elapsed().as_millis() as u64, "error": err })
+            }
+            Err(e) => {
+                json!({ "path": path, "status": null, "error": format!("richiesta al gateway: {e}") })
+            }
+        };
+        results.push(r);
+    }
+    audit::log(
+        "cache.warm",
+        &format!("{} · {} file", req.rule, req.paths.len()),
+    );
+    json(StatusCode::OK, json!({ "results": results }))
+}
+
+// ---------------------------------------------------------------------------
+// Diagnosi di un URL
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct DiagnoseReq {
+    url: String,
+}
+
+/// Segue il percorso di una richiesta e dice dove si ferma.
+async fn diagnose(admin: &Admin, req: DiagnoseReq) -> Response<Body> {
+    use crate::diag::{Status, Step};
+    let raw = req.url.trim();
+    let with_scheme = if raw.contains("://") {
+        raw.to_owned()
+    } else {
+        format!("http://{raw}")
+    };
+    let parsed =
+        match url::Url::parse(&with_scheme) {
+            Ok(u) if matches!(u.scheme(), "http" | "https") && u.host_str().is_some() => u,
+            _ => return bad(
+                "indirizzo non valido: scrivi per esempio https://cdn.example.com/foto/barca.jpg",
+            ),
+        };
+    let host = match config::normalize_host(parsed.host_str().unwrap_or_default()) {
+        Ok(h) => h,
+        Err(e) => return bad(format!("host: {e}")),
+    };
+    let raw_path = if parsed.path().is_empty() {
+        "/"
+    } else {
+        parsed.path()
+    };
+    let mut steps: Vec<Step> = Vec::new();
+    let panel = panel::load(&admin.state_dir).unwrap_or_default();
+    let http_port = panel.settings.http();
+
+    // 0. indirizzo
+    let mut first = Step::new("url", "Indirizzo", Status::Ok, format!("{host}{raw_path}"));
+    if parsed.scheme() == "https" {
+        first = Step::new(
+            "url",
+            "Indirizzo",
+            Status::Warn,
+            format!("{host}{raw_path} — il nodo risponde solo in HTTP: HTTPS dipende da un proxy davanti."),
+        )
+        .fix("Se lo apri in HTTPS e non funziona, la causa può essere il proxy/CDN e non OtterRoute (vedi la guida «HTTPS e proxy»).");
+    }
+    steps.push(first);
+
+    // 1. DNS e nodo
+    let listed = panel.domains.iter().any(|d| d.host == host);
+    let dom = dns::check_domain(&host, http_port, &admin.state.node_id).await;
+    let mut dom_step = if dom.ok {
+        let recs = if dom.records.is_empty() {
+            "dominio locale".to_owned()
+        } else {
+            dom.records.join(", ")
+        };
+        Step::new(
+            "dns",
+            "Il dominio arriva a questo nodo",
+            Status::Ok,
+            format!("Risolve a {recs} e il nodo risponde sulla porta {http_port}."),
+        )
+    } else {
+        let failing = dom.stages.iter().find(|s| s.status == "fail");
+        let fix = match failing.map(|s| s.id.as_str()) {
+            Some("reach") => "Il dominio risolve ma la richiesta non arriva a questo nodo: controlla firewall, port forwarding, proxy/CDN e la porta HTTP nelle Impostazioni.",
+            _ => "Crea o correggi il record A/AAAA/CNAME del dominio e attendi la propagazione (vedi «Domini e DNS»).",
+        };
+        Step::new(
+            "dns",
+            "Il dominio arriva a questo nodo",
+            Status::Fail,
+            dom.message.clone(),
+        )
+        .fix(fix)
+    };
+    if dom.ok && !listed && !dns::is_local_name(&host) {
+        dom_step = Step::new(
+            "dns",
+            "Il dominio arriva a questo nodo",
+            Status::Warn,
+            format!(
+                "{} Non è però tra i domini censiti nel pannello.",
+                dom_step.detail
+            ),
+        )
+        .fix("Aggiungilo da Domini per tenerlo sotto controllo e riceverne gli avvisi.");
+    }
+    steps.push(dom_step);
+
+    // 2. instradamento (si valuta comunque: aiuta anche se il DNS non c'è ancora)
+    let snap = admin.state.snapshot.load_full();
+    let path = match crate::routing::normalize_path(raw_path) {
+        Ok(p) => Some(p),
+        Err(_) => {
+            steps.push(
+                Step::new("route", "Instradamento", Status::Fail, "Il percorso non è valido (contiene «..», barre codificate o caratteri di controllo).")
+                    .fix("Usa un percorso normale, come /foto/barca.jpg."),
+            );
+            None
+        }
+    };
+    let route = path
+        .as_deref()
+        .and_then(|p| snap.match_route(&host, p).cloned());
+    let mut object_key = None;
+    if let Some(p) = &path {
+        match &route {
+            None => {
+                let known: Vec<String> = snap
+                    .routes_by_host
+                    .get(&host)
+                    .map(|v| v.iter().map(|r| r.path_prefix.clone()).collect())
+                    .unwrap_or_default();
+                let (detail, fix) = if known.is_empty() {
+                    (
+                        "Nessun instradamento per questo dominio: il nodo risponde 404.".to_owned(),
+                        "Crea un instradamento da Instradamenti, scegliendo questo dominio."
+                            .to_owned(),
+                    )
+                } else {
+                    (format!("Il dominio ha instradamenti solo per: {}. Il percorso {p} non corrisponde a nessuno.", known.join(", ")), "Usa un percorso che inizi con uno di quei prefissi, o crea un instradamento per questo.".to_owned())
+                };
+                steps.push(Step::new("route", "Instradamento", Status::Fail, detail).fix(fix));
+            }
+            Some(r) => {
+                object_key = r.object_key(p);
+                match &object_key {
+                    Some(k) => steps.push(Step::new(
+                        "route",
+                        "Instradamento",
+                        Status::Ok,
+                        format!("Regola «{}» ({}{}): il file cercato è «{}» nel bucket «{}».", r.id, r.host, r.path_prefix, k, r.dest.bucket),
+                    )),
+                    None => steps.push(
+                        Step::new("route", "Instradamento", Status::Fail, "Il percorso è una cartella o è vuoto dopo il prefisso: OtterRoute non elenca le cartelle e risponde 404.")
+                            .fix("Indica il nome di un file, per esempio /foto/barca.jpg."),
+                    ),
+                }
+            }
+        }
+    }
+    let routed = route.clone().zip(object_key.clone());
+
+    // 3. cache
+    let cache_label = "Cache";
+    match &routed {
+        None => steps.push(Step::skipped("cache", cache_label)),
+        Some((r, key)) => {
+            let ck = crate::routing::cache_key(r, key, "");
+            match admin.state.cache.lookup(&ck).await {
+                None => steps.push(Step::new(
+                    "cache",
+                    cache_label,
+                    Status::Ok,
+                    "Non è in cache: la prima richiesta lo legge dallo storage (MISS) e lo salva.",
+                )),
+                Some(e) => {
+                    let (st, d) = crate::diag::cache_state(
+                        e.meta.status,
+                        e.age().as_secs(),
+                        e.is_fresh(&r.policy),
+                        e.is_usable_stale(&r.policy),
+                        r.policy.ttl.as_secs(),
+                    );
+                    let mut s = Step::new("cache", cache_label, st, d);
+                    if e.meta.status == 404 {
+                        s = s.fix("Se il file ora esiste, attendi la scadenza della cache negativa (60 s) o svuotala da Instradamenti → Cache.");
+                    }
+                    steps.push(s);
+                }
+            }
+        }
+    }
+
+    // 4. storage
+    let storage_label = "Storage";
+    let mut storage_ok = false;
+    match &routed {
+        None => steps.push(Step::skipped("storage", storage_label)),
+        Some((r, key)) => match panel.buckets.iter().find(|b| b.id == r.dest.storage.id) {
+            None => steps.push(Step::new("storage", storage_label, Status::Skip, "Configurazione scritta a mano: la verifica dello storage dal pannello non è disponibile.")),
+            Some(b) => match bucket_test_req(admin, b) {
+                Err(e) => steps.push(Step::new("storage", storage_label, Status::Fail, format!("Credenziali del bucket non leggibili: {e}")).fix("Rimuovi e ricrea il bucket inserendo di nuovo le chiavi.")),
+                Ok(mut t) => {
+                    t.prefix = String::new();
+                    t.file = key.clone();
+                    let t0 = Instant::now();
+                    let out = storage_test(&t).await;
+                    let ms = t0.elapsed().as_millis();
+                    let outcome = out["outcome"].as_str().unwrap_or("invalid");
+                    if outcome == "found" {
+                        storage_ok = true;
+                        let size = out["size"].as_str().filter(|s| !s.is_empty()).map(|s| format!(", {s} byte")).unwrap_or_default();
+                        let ct = out["content_type"].as_str().filter(|s| !s.is_empty()).map(|s| format!(", {s}")).unwrap_or_default();
+                        steps.push(Step::new("storage", storage_label, Status::Ok, format!("«{}» è leggibile su {} ({ms} ms{size}{ct}).", key, b.name)));
+                    } else {
+                        let msg = out["message"].as_str().unwrap_or("errore").to_owned();
+                        steps.push(Step::new("storage", storage_label, Status::Fail, msg).fix(crate::diag::storage_fix(outcome)));
+                    }
+                }
+            },
+        },
+    }
+
+    // 5. risposta reale del nodo (può riempire la cache, come una visita vera)
+    let resp_label = "Risposta del nodo";
+    if routed.is_none() {
+        steps.push(Step::skipped("response", resp_label));
+    } else if let Ok(client) = s3::build_client(true) {
+        let url = format!("http://127.0.0.1:{}{}", admin.listen_port, raw_path);
+        let t0 = Instant::now();
+        match client.get(&url).header(header::HOST, &host).send().await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let xc = resp
+                    .headers()
+                    .get("x-cache")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("—")
+                    .to_owned();
+                let ms = t0.elapsed().as_millis();
+                let ok = status < 300;
+                let mut s = Step::new(
+                    "response",
+                    resp_label,
+                    if ok { Status::Ok } else { Status::Fail },
+                    format!("HTTP {status}, X-Cache: {xc}, {ms} ms."),
+                );
+                if !ok {
+                    s = s.fix(if storage_ok { "Lo storage risponde ma il nodo no: guarda i log del nodo (RUST_LOG=otterroute=debug)." } else { "Vedi il passaggio «Storage» qui sopra." });
+                }
+                steps.push(s);
+            }
+            Err(e) => steps.push(
+                Step::new(
+                    "response",
+                    resp_label,
+                    Status::Fail,
+                    format!("Richiesta al nodo non riuscita: {e}"),
+                )
+                .fix("Il nodo non risponde sulla sua porta pubblica: controlla OTR_LISTEN."),
+            ),
+        }
+    } else {
+        steps.push(Step::skipped("response", resp_label));
+    }
+
+    let when = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let node = format!(
+        "nodo {}",
+        admin.state.node_id.chars().take(8).collect::<String>()
+    );
+    let report = crate::diag::report(
+        &format!("{}://{host}{raw_path}", parsed.scheme()),
+        &node,
+        &when,
+        &steps,
+    );
+    audit::log("diagnose", &format!("{host}{raw_path}"));
+    json(
+        StatusCode::OK,
+        json!({ "steps": steps, "summary": crate::diag::summary(&steps), "report": report }),
+    )
 }
 
 // ---------------------------------------------------------------------------

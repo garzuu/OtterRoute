@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 A bucket is an S3-compatible storage (AWS, Cloudflare R2, Backblaze B2, Wasabi, MinIO…) from which OtterRoute reads files. Add one from **Buckets → New bucket**.
 
+![Registered buckets, with the state of the last check](/screens/buckets.jpg)
+<p class="shot-caption">Registered buckets, with the state of the last check · 26/09/2026</p>
+
 ## The fields
 
 | Field | What to enter |

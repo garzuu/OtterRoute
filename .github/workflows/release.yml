@@ -1,0 +1,151 @@
+name: Release
+
+# Si avvia con un tag `v*` (es. v0.1.0, v0.1.0-rc1). Costruisce i binari con il
+# pannello e la guida, pubblica l'immagine su GHCR e crea la release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  assets:
+    name: Pannello e guida
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Pannello
+        run: npm ci && npm run build
+        working-directory: web
+      - name: Guida (base /docs/, servita dal nodo)
+        run: npm ci && DOCS_BASE=/docs/ npx vitepress build
+        working-directory: docs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assets
+          path: |
+            web/dist
+            docs/.vitepress/dist
+          if-no-files-found: error
+
+  binaries:
+    needs: assets
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,    target: x86_64-unknown-linux-musl,  name: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, name: linux-aarch64 }
+          - { os: macos-latest,     target: aarch64-apple-darwin,       name: macos-aarch64 }
+          - { os: macos-latest,     target: x86_64-apple-darwin,        name: macos-x86_64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - name: musl-tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - uses: Swatinem/rust-cache@v2
+        with: { key: "${{ matrix.target }}" }
+      - run: cargo build --release --locked -p otterroute --target ${{ matrix.target }}
+      - uses: actions/download-artifact@v4
+        with: { name: assets, path: assets }
+      - name: Pacchetto
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME:-dev}"
+          d="otterroute-$v-${{ matrix.name }}"
+          mkdir -p "$d/ui" "$d/docs"
+          cp target/${{ matrix.target }}/release/otterroute "$d/"
+          cp -R assets/web/dist/. "$d/ui/"
+          cp -R assets/docs/.vitepress/dist/. "$d/docs/"
+          cp README.md LICENSE-MIT LICENSE-APACHE CHANGELOG.md "$d/"
+          cat > "$d/run.sh" <<'RUN'
+          #!/bin/sh
+          # Avvio rapido: pannello su http://127.0.0.1:9090/  ·  guida su /docs/
+          here="$(cd "$(dirname "$0")" && pwd)"
+          OTR_UI_DIR="$here/ui" OTR_DOCS_DIR="$here/docs" exec "$here/otterroute" "$@"
+          RUN
+          chmod +x "$d/run.sh"
+          tar czf "$d.tar.gz" "$d"
+          (shasum -a 256 "$d.tar.gz" 2>/dev/null || sha256sum "$d.tar.gz") > "$d.tar.gz.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.name }}
+          path: |
+            otterroute-*.tar.gz
+            otterroute-*.tar.gz.sha256
+
+  image:
+    name: Immagine
+    runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+      # prima si costruisce e si PROVA l'immagine (amd64), poi si pubblica multi-arch
+      - name: Build amd64 per la prova
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: otterroute:smoke
+      - name: Prova dell'immagine
+        run: |
+          docker run -d --name smoke -p 127.0.0.1:19090:9090 --sysctl net.ipv4.ip_unprivileged_port_start=0 otterroute:smoke
+          for i in $(seq 40); do curl -sf http://127.0.0.1:19090/healthz && break; sleep 0.5; done
+          curl -sf http://127.0.0.1:19090/healthz
+          curl -sf -o /dev/null http://127.0.0.1:19090/                  # pannello
+          curl -sf -o /dev/null http://127.0.0.1:19090/docs/             # guida offline
+          curl -sf http://127.0.0.1:19090/api/session | grep -q '"setup_required":true'
+          docker logs smoke
+          docker rm -f smoke
+      - name: Pubblica multi-arch
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    needs: [binaries, image]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: bin-*, path: dist, merge-multiple: true }
+      - name: Note dal CHANGELOG
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## \\["v"\\]" {p=1; next} /^## \[/ {p=0} p' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Vedi il CHANGELOG." > notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body_path: notes.md
+          prerelease: ${{ contains(github.ref_name, '-') }}

@@ -3,7 +3,7 @@ source_commit: dd1d866
 ---
 # Troubleshooting
 
-Look for the message you see in the panel or in the response.
+Look for the message you see in the panel or in the response. If you cannot find it, the [Diagnosis](./diagnosis) page follows a file's path and says where it stops.
 
 ## Domains
 

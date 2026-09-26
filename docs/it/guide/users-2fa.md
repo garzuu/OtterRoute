@@ -2,6 +2,9 @@
 
 Il pannello supporta più utenti, ognuno con i propri permessi, e la verifica in due passaggi. Il primo utente creato all'avvio è **Amministratore**.
 
+![Utenti e ruoli, con il criterio di sicurezza](/screens/users.jpg)
+<p class="shot-caption">Utenti e ruoli, con il criterio di sicurezza · 26/09/2026</p>
+
 ## Ruoli e scope
 
 Un **ruolo** è un insieme di **scope**, cioè di azioni permesse. Ogni azione del pannello richiede uno scope preciso e il server lo controlla a ogni richiesta.

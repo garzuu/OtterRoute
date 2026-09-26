@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 The node can alert you **by email and Telegram** when a domain or a bucket stops working, and when it is back. This way you do not need to keep the panel open. They are configured from **Notifications** in the menu (the `notifications:manage` scope is required, by default only the Administrator has it).
 
+![The Notifications page: channels, thresholds and rules](/screens/notifications.jpg)
+<p class="shot-caption">The Notifications page: channels, thresholds and rules · 26/09/2026</p>
+
 ## What is notified
 
 The same alerts as the panel's bell:

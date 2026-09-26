@@ -256,6 +256,25 @@ impl Cache {
         self.evict_if_needed();
     }
 
+    /// Elimina una copia (metadati e corpo) dal disco e dall'indice. Restituisce
+    /// se esisteva.
+    pub async fn remove(&self, key: &str) -> bool {
+        let existed = {
+            let mut i = self.index.lock().unwrap();
+            match i.entries.remove(key) {
+                Some(o) => {
+                    i.total -= o.size;
+                    true
+                }
+                None => false,
+            }
+        };
+        let (mp, bp) = self.paths(key);
+        let _ = tokio::fs::remove_file(&mp).await;
+        let _ = tokio::fs::remove_file(&bp).await;
+        existed
+    }
+
     fn forget(&self, key: &str) {
         let mut i = self.index.lock().unwrap();
         if let Some(o) = i.entries.remove(key) {
@@ -452,6 +471,28 @@ mod tests {
         let c2 = Cache::open(dir.path(), 25).unwrap();
         assert_eq!(c2.stats().entries, 3);
         assert_eq!(c2.lookup(&key(9)).await.unwrap().meta.status, 404);
+    }
+
+    #[tokio::test]
+    async fn remove_deletes_files_and_index() {
+        let dir = tempfile::tempdir().unwrap();
+        let c = Cache::open(dir.path(), 1000).unwrap();
+        for n in 0..2u8 {
+            let mut w = c.writer(&key(n)).await.unwrap();
+            w.write(&[n; 10]).await.unwrap();
+            w.commit(&c, 200, vec![]).await.unwrap();
+        }
+        assert_eq!(c.stats().bytes, 20);
+        assert!(c.remove(&key(0)).await);
+        assert!(!c.remove(&key(0)).await, "già rimossa");
+        assert!(c.lookup(&key(0)).await.is_none());
+        assert_eq!((c.stats().entries, c.stats().bytes), (1, 10));
+        let (mp, bp) = c.paths(&key(0));
+        assert!(!mp.exists() && !bp.exists());
+        assert!(c.lookup(&key(1)).await.is_some(), "le altre restano");
+        // dopo un riavvio la copia rimossa non ricompare
+        drop(c);
+        assert_eq!(Cache::open(dir.path(), 1000).unwrap().stats().entries, 1);
     }
 
     #[tokio::test]

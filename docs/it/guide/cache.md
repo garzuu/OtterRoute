@@ -2,6 +2,9 @@
 
 Ogni file richiesto viene tenuto su disco. Le richieste successive partono dal disco senza toccare lo storage.
 
+![Sezione «Cache» della riga di un instradamento: svuota e precarica](/screens/routes.jpg)
+<p class="shot-caption">Sezione «Cache» della riga di un instradamento: svuota e precarica · 26/09/2026</p>
+
 ## Cosa dice `X-Cache`
 
 | Valore | Significato |
@@ -36,12 +39,22 @@ Per cambiare questi valori si modifica la configurazione a mano (vedi [config.ya
 - **Intestazioni HTTP.** Sono gestiti `ETag`, `If-None-Match`, `If-Modified-Since`, `Range`, `If-Range`; gli header `x-amz-*` dello storage non arrivano mai al visitatore.
 - **Errori.** Un `403 AccessDenied` dello storage per un file mancante diventa `404`; credenziali sbagliate danno `502` e **non** vengono mai messe in cache.
 
-## Svuotare la cache di una destinazione
+## Svuotare e precaricare dal pannello
 
-Aumentando `cache_generation` di una destinazione nella configurazione cambiano le chiavi di cache: le copie vecchie diventano irraggiungibili e vengono eliminate dall'LRU. Non si cancella nulla dal disco.
+Da **Instradamenti**, espandi la riga di un instradamento: nella sezione **Cache** trovi tre azioni (serve lo scope `routes:write`).
+
+| Azione | Cosa fa |
+|---|---|
+| **Svuota file** | Elimina la copia di un solo file (scrivi il nome, es. `barca.jpg`): la richiesta successiva lo rilegge dallo storage. Ti dice se il file era in cache. |
+| **Svuota tutto** | Svuota la cache dell'instradamento con un click e una conferma. Non cancella nulla dal disco: aumenta il `cache_generation` dell'instradamento, quindi le vecchie copie diventano irraggiungibili e l'LRU le elimina. |
+| **Precarica** | Elenca fino a 200 file, uno per riga: il nodo li richiede da solo, uno alla volta, così la prima visita è già `HIT`. Per ogni file vedi stato, `X-Cache`, byte e tempo. Il precaricamento si interrompe dopo 2 minuti; i file rimasti sono segnalati come non eseguiti. |
+
+Svuotare non elimina il file dallo storage né dalle eventuali cache davanti al nodo (CDN, browser): quelle hanno i loro tempi.
+
+Nella configurazione a mano lo stesso effetto si ottiene aumentando `cache_generation` di una destinazione.
 
 ## Limiti noti
 
 - `HEAD` e `Range` senza una copia in cache passano allo storage senza riempirla: il primo accesso a un video "a pezzi" non lo mette in cache.
 - Non c'è `index.html` automatico per le cartelle.
-- Il pannello non ha ancora un pulsante per svuotare la cache.
+- Il precaricamento scarica interamente ogni file: con file molto grandi (fino al limite `OTR_CACHE_MAX_OBJECT_BYTES`) può richiedere tempo.

@@ -117,6 +117,13 @@ pub struct Rule {
     pub bucket_id: String,
     #[serde(default)]
     pub folder: String,
+    /// aumentarlo rende irraggiungibili le copie in cache dell'instradamento
+    #[serde(default = "first_generation")]
+    pub cache_generation: u64,
+}
+
+fn first_generation() -> u64 {
+    1
 }
 
 pub fn panel_path(state_dir: &Path) -> PathBuf {
@@ -170,7 +177,7 @@ pub fn generate_config(panel: &Panel, version: u64, secrets: &Path) -> Value {
             "bucket": b.bucket,
             "prefix": r.folder,
             "revision": 1,
-            "cache_generation": 1,
+            "cache_generation": r.cache_generation,
         }));
         routes.push(json!({
             "id": r.id,
@@ -225,12 +232,18 @@ mod tests {
                 path_prefix: "/".into(),
                 bucket_id: "b1".into(),
                 folder: "foto/".into(),
+                cache_generation: 4,
             }],
             ..Panel::default()
         };
         let yaml = serde_yaml::to_string(&generate_config(&panel, 3, dir.path())).unwrap();
         let snap = crate::config::parse(yaml.as_bytes()).unwrap();
         assert_eq!(snap.version, 3);
+        assert_eq!(
+            yaml.matches("cache_generation: 4").count(),
+            1,
+            "la generazione della regola arriva in configurazione"
+        );
         assert_eq!(snap.route_count(), 1);
         assert_eq!(
             snap.routes_by_host["img.example.com"][0].dest.prefix,

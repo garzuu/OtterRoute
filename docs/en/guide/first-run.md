@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 A freshly installed node is empty: no users, no domains, no storage.
 
+![The Overview of a node with some traffic](/screens/overview.jpg)
+<p class="shot-caption">The Overview of a node with some traffic · 26/09/2026</p>
+
 ## 1. Create the administrator
 
 Open the panel at `http://127.0.0.1:9090/`. If you are on a remote server **do not open port 9090**: use an SSH tunnel and open the address from your computer.
