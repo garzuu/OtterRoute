@@ -1,0 +1,26 @@
+# Immagine di RILASCIO: non compila nulla, usa i pacchetti già costruiti (e firmati) dal workflow
+# `Release`. Il contesto contiene ctx/linux-amd64/ e ctx/linux-arm64/ con `otterroute`, `ui/` e `docs/`
+# estratti dai tarball. Per costruire dai sorgenti usa il `Dockerfile`.
+FROM debian:bookworm-slim
+ARG TARGETARCH
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --system --uid 10001 --home /data otter \
+ && mkdir -p /data/cache /data/state && chown -R otter /data
+COPY ctx/linux-${TARGETARCH}/otterroute /usr/local/bin/otterroute
+COPY ctx/linux-${TARGETARCH}/ui /usr/share/otterroute/ui
+COPY ctx/linux-${TARGETARCH}/docs /usr/share/otterroute/docs
+USER otter
+ENV OTR_INSTALL=docker \
+    OTR_CACHE_DIR=/data/cache \
+    OTR_STATE_DIR=/data/state \
+    OTR_CONFIG=/data/config.yaml \
+    OTR_UI_DIR=/usr/share/otterroute/ui \
+    OTR_DOCS_DIR=/usr/share/otterroute/docs \
+    OTR_LISTEN=0.0.0.0:80 \
+    OTR_ADMIN_LISTEN=0.0.0.0:9090
+VOLUME ["/data"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["otterroute", "--healthcheck"]
+EXPOSE 80 443 9090
+ENTRYPOINT ["otterroute"]
