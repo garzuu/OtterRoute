@@ -40,6 +40,32 @@ pub struct Settings {
     /// dominio su cui il pannello si serve anche in HTTPS (oltre alla porta locale)
     #[serde(default)]
     pub admin_host: Option<String>,
+    /// controllo delle nuove versioni
+    #[serde(default)]
+    pub updates: UpdateSettings,
+}
+
+/// Controllo delle nuove versioni: acceso di default.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateSettings {
+    #[serde(default = "yes")]
+    pub check: bool,
+    /// propone anche le pre-release (`-rc`)
+    #[serde(default)]
+    pub prerelease: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+impl Default for UpdateSettings {
+    fn default() -> Self {
+        Self {
+            check: true,
+            prerelease: false,
+        }
+    }
 }
 
 /// Certificati automatici (ACME): con `enabled` il nodo li ottiene e li rinnova da solo.

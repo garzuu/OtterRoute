@@ -41,9 +41,47 @@ The backup contains keys and hashes: keep it encrypted and with restricted permi
 
 ## Upgrading
 
-1. Make a backup.
-2. Replace the binary (or the image) and restart.
+OtterRoute **does not update itself**: the panel warns you when a new version exists and shows the steps for your type of installation; you do the update.
+
+### Knowing whether there is a new version
+
+The node checks **once a day** the public releases on GitHub (one request, sending nothing about the node). If it finds a newer one, an alert appears in the bell and a card in **Settings → Updates**, with notes and commands. From there you can also **Check now**, include test versions (pre-releases) or turn the check off. With `OTR_UPDATE_CHECK=off` the node never contacts GitHub (closed environments). After an update, for 24 hours an alert tells you which version you came from.
+
+### Common steps
+
+1. Make a backup of the state folder.
+2. Replace the program with the new version (according to the installation type below) and restart.
 3. Log in again: sessions do not survive a restart.
+
+### Docker
+
+The image is not replaced from the inside: you pull the new one and recreate the container **with the same volume**. → [Docker](./docker)
+
+```sh
+docker pull ghcr.io/garzuu/otterroute:0.1
+docker stop otterroute && docker rm otterroute
+# re-run the SAME "docker run" command as before (same ports, same /data volume)
+```
+
+### Binary or service (systemd, launchd)
+
+Download from the [releases page](https://github.com/garzuu/OtterRoute/releases) the package for your platform, verify its checksum and replace the executable (and the `ui/` and `docs/` folders next to it):
+
+```sh
+sha256sum -c otterroute-vX.Y.Z-linux-x86_64.tar.gz.sha256
+tar xzf otterroute-vX.Y.Z-linux-x86_64.tar.gz
+sudo systemctl stop otterroute
+sudo install -m 0755 otterroute-vX.Y.Z-linux-x86_64/otterroute /usr/local/bin/otterroute
+sudo systemctl start otterroute
+```
+
+Keep the old executable (`otterroute.prev`) until you have seen the new version start correctly.
+
+### From source
+
+```sh
+git pull && cargo build --release -p otterroute && (cd web && npm ci && npm run build)
+```
 
 **Automatic migrations:** if you upgrade from a version with a single administrator (`admin.json`), on first start the user is migrated to `users.json` with the same Administrator role and the same password; the old file becomes `admin.json.migrated`.
 

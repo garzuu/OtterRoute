@@ -38,9 +38,47 @@ Il backup contiene chiavi e hash: conservalo cifrato e con permessi ristretti.
 
 ## Aggiornare
 
-1. Fai un backup.
-2. Sostituisci il binario (o l'immagine) e riavvia.
+OtterRoute **non si aggiorna da solo**: il pannello ti avvisa quando c'è una versione nuova e ti mostra i passi per il tuo tipo di installazione; l'aggiornamento lo fai tu.
+
+### Sapere se c'è una versione nuova
+
+Il nodo controlla **una volta al giorno** le release pubbliche su GitHub (una richiesta, senza inviare nulla del nodo). Se ne trova una più recente compare un avviso nella campanella e una scheda in **Impostazioni → Aggiornamenti**, con le note e i comandi. Da lì puoi anche **Controllare subito**, includere le versioni di prova (pre-release) o spegnere il controllo. Con `OTR_UPDATE_CHECK=off` il nodo non contatta mai GitHub (ambienti chiusi). Dopo un aggiornamento, per 24 ore un avviso ti dice da quale versione arrivi.
+
+### Passi comuni
+
+1. Fai un backup della cartella di stato.
+2. Sostituisci il programma con la versione nuova (secondo il tipo di installazione qui sotto) e riavvia.
 3. Accedi di nuovo: le sessioni non sopravvivono al riavvio.
+
+### Docker
+
+Non si sostituisce l'immagine dall'interno: si scarica la nuova e si ricrea il container **con lo stesso volume**. → [Docker](./docker)
+
+```sh
+docker pull ghcr.io/garzuu/otterroute:0.1
+docker stop otterroute && docker rm otterroute
+# rilancia lo STESSO comando "docker run" di prima (stesse porte, stesso volume /data)
+```
+
+### Binario o servizio (systemd, launchd)
+
+Scarica dalla [pagina delle release](https://github.com/garzuu/OtterRoute/releases) il pacchetto per la tua piattaforma, verificane il checksum e sostituisci l'eseguibile (e le cartelle `ui/` e `docs/` accanto a lui):
+
+```sh
+sha256sum -c otterroute-vX.Y.Z-linux-x86_64.tar.gz.sha256
+tar xzf otterroute-vX.Y.Z-linux-x86_64.tar.gz
+sudo systemctl stop otterroute
+sudo install -m 0755 otterroute-vX.Y.Z-linux-x86_64/otterroute /usr/local/bin/otterroute
+sudo systemctl start otterroute
+```
+
+Tieni il vecchio eseguibile (`otterroute.prev`) finché non hai visto che la versione nuova parte bene.
+
+### Dai sorgenti
+
+```sh
+git pull && cargo build --release -p otterroute && (cd web && npm ci && npm run build)
+```
 
 **Migrazioni automatiche:** se aggiorni da una versione con un solo amministratore (`admin.json`), al primo avvio l'utente viene migrato in `users.json` con lo stesso ruolo Amministratore e la stessa password; il vecchio file diventa `admin.json.migrated`.
 

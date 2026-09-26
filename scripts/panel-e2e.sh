@@ -11,7 +11,7 @@ cleanup() { for p in "${pids[@]}"; do kill "$p" 2>/dev/null; done; wait 2>/dev/n
 trap cleanup EXIT
 
 cargo build -q -p otterroute || exit 1
-GW=127.0.0.1:28301; ADMIN=127.0.0.1:29301; S3=127.0.0.1:29302; TLSADDR=127.0.0.1:28303
+GW=127.0.0.1:28301; ADMIN=127.0.0.1:29301; S3=127.0.0.1:29302; GH=127.0.0.1:29303; TLSADDR=127.0.0.1:28303
 J='Content-Type: application/json'
 pass=0; fail=0
 check() { if [[ "$2" == "$3" ]]; then pass=$((pass+1)); printf '  ok   %s\n' "$1"; else fail=$((fail+1)); printf '  FAIL %s: atteso [%s] ottenuto [%s]\n' "$1" "$2" "$3"; fi; }
@@ -33,7 +33,8 @@ def chunk(t, d): return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zl
 open(sys.argv[1], "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 PYPNG
 python3 scripts/fake-s3.py --root "$work/s3" --port 29302 --access-key AK --secret-key SK & pids+=($!)
-RUST_LOG=otterroute=warn ./target/debug/otterroute --config "$work/config.yaml" --listen $GW --admin-listen $ADMIN --https-listen $TLSADDR \
+python3 scripts/fake-github.py --port 29303 --latest 9.9.9 & pids+=($!)
+RUST_LOG=otterroute=warn OTR_UPDATE_API="http://$GH" ./target/debug/otterroute --config "$work/config.yaml" --listen $GW --admin-listen $ADMIN --https-listen $TLSADDR \
   --cache-dir "$work/cache" --state-dir "$work/state" --ui-dir "$work/ui" >"$work/gw.log" 2>&1 & pids+=($!)
 for _ in $(seq 60); do curl -sf $ADMIN/healthz >/dev/null && break; sleep 0.1; done
 
@@ -235,9 +236,9 @@ check "attiva i certificati automatici (staging)" True "$(b='{"enabled":true,"em
 check "emissione per un dominio locale rifiutata" 422 "$(b='{"host":"img.localhost"}'; code $ADMIN/api/certs/issue -d "$b")"
 check "le impostazioni restano salvate" admin@example.com "$(api $ADMIN/api/panel | jget "d['panel']['settings']['acme']['email']")"
 check "spegne i certificati automatici" False "$(b='{"enabled":false}'; api -X PUT $ADMIN/api/https -d "$b" | jget "str(d['enabled'])")"
-kill "${pids[1]}" 2>/dev/null; wait "${pids[1]}" 2>/dev/null
-RUST_LOG=otterroute=warn ./target/debug/otterroute --config "$work/config.yaml" --listen $GW --admin-listen $ADMIN --https-listen $TLSADDR \
-  --cache-dir "$work/cache" --state-dir "$work/state" --ui-dir "$work/ui" >>"$work/gw.log" 2>&1 & pids[1]=$!
+kill "${pids[2]}" 2>/dev/null; wait "${pids[2]}" 2>/dev/null
+RUST_LOG=otterroute=warn OTR_UPDATE_API="http://$GH" ./target/debug/otterroute --config "$work/config.yaml" --listen $GW --admin-listen $ADMIN --https-listen $TLSADDR \
+  --cache-dir "$work/cache" --state-dir "$work/state" --ui-dir "$work/ui" >>"$work/gw.log" 2>&1 & pids[2]=$!
 for _ in $(seq 60); do curl -sf $ADMIN/healthz >/dev/null && break; sleep 0.1; done
 check "riavvio: il certificato si ricarica da disco" 200 "$(hs /barca.jpg)"
 rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"admin","password":"password-admin-1"}' >/dev/null
@@ -274,6 +275,25 @@ check "disattiva il pannello in HTTPS" None "$(api -X PUT $ADMIN/api/admin-host 
 check "disattivato: il dominio torna un dominio normale (404)" 404 "$(hsm -o /dev/null -w '%{http_code}' https://media.localhost:$tp/api/session)"
 check "…e l'HTTP non reindirizza più" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: media.localhost' "http://$GW/api/session")"
 
+echo "== aggiornamenti"
+gh_hits() { curl -s "http://$GH/__hits"; }
+check "all'inizio nessuna versione nota" False "$(api $ADMIN/api/panel | jget "d['update']['available']")"
+check "…la versione in esecuzione è indicata" 1 "$(api $ADMIN/api/panel | jget "int(bool(d['update']['current']))")"
+check "…tipo di installazione: binario di prova (sorgenti)" source "$(api $ADMIN/api/panel | jget "d['update']['kind']")"
+h0="$(gh_hits)"
+check "«Controlla ora» trova la versione nuova" 9.9.9 "$(api -X POST $ADMIN/api/update/check -d '{}' | jget "d['update']['latest']['version'] if 'update' in d else d['latest']['version']")"
+check "…la pre-release più alta non viene proposta" True "$(api $ADMIN/api/panel | jget "d['update']['latest']['version']=='9.9.9'")"
+check "…è disponibile" True "$(api $ADMIN/api/panel | jget "d['update']['available']")"
+check "…con le note" 1 "$(api $ADMIN/api/panel | jget "int('prova' in d['update']['latest']['notes'])")"
+check "…una sola richiesta a GitHub" $((h0+1)) "$(gh_hits)"
+check "lo stato è salvato su disco" 1 "$([[ -s "$work/state/update.json" ]] && echo 1 || echo 0)"
+check "con le pre-release attive si propone la rc" 10.0.0-rc1 "$(b='{"check":true,"prerelease":true}'; api -X PUT $ADMIN/api/updates -d "$b" | jget "d['latest']['version']")"
+api -X PUT $ADMIN/api/updates -d '{"check":false,"prerelease":false}' >/dev/null
+check "controllo spento: il pannello lo dice" False "$(api $ADMIN/api/panel | jget "d['update']['enabled']")"
+h1="$(gh_hits)"
+check "…«Controlla ora» resta possibile (lo chiede l'utente)" 9.9.9 "$(api -X POST $ADMIN/api/update/check -d '{}' | jget "d['update']['latest']['version'] if 'update' in d else d['latest']['version']")"
+api -X PUT $ADMIN/api/updates -d '{"check":true,"prerelease":false}' >/dev/null
+
 echo "== permessi"
 api $ADMIN/api/users -d '{"username":"lettore","role":"viewer","password":"password-lettore-1"}' >/dev/null
 rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"lettore","password":"password-lettore-1"}' >/dev/null
@@ -285,6 +305,8 @@ check "sola lettura: niente HTTPS automatico" 403 "$(b='{"enabled":true}'; code 
 check "sola lettura: niente caricamento certificati" 403 "$(b='{"host":"img.localhost","chain":"x","key":"y"}'; code $ADMIN/api/certs/upload -d "$b")"
 check "sola lettura: niente redirect" 403 "$(b='{"host":"img.localhost","enabled":true}'; code $ADMIN/api/domains/redirect -d "$b")"
 check "sola lettura: non attiva le immagini" 403 "$(code -X PUT $ADMIN/api/rules/$rid -d '{"images":true}')"
+check "sola lettura: non cambia le impostazioni degli aggiornamenti" 403 "$(b='{"check":false}'; code -X PUT $ADMIN/api/updates -d "$b")"
+check "sola lettura: non forza il controllo" 403 "$(code $ADMIN/api/update/check -d '{}')"
 check "sola lettura: niente link" 403 "$(b='{"rule":"x","path":"/a","ttl_secs":60}'; code $ADMIN/api/links -d "$b")"
 check "sola lettura: non ruota la chiave" 403 "$(code $ADMIN/api/links/rotate -d '{}')"
 check "sola lettura: non attiva i link firmati" 403 "$(code -X PUT $ADMIN/api/rules/$rid -d '{"signed":true}')"

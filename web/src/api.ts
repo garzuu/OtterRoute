@@ -91,6 +91,27 @@ export interface DomainInfo {
   redirect_https: boolean;
 }
 
+export interface UpdateRelease {
+  version: string;
+  notes: string;
+  url: string;
+  published_at: string;
+  prerelease: boolean;
+}
+
+export interface UpdateInfo {
+  current: string;
+  kind: "docker" | "service" | "binary" | "source";
+  enabled: boolean;
+  env_disabled: boolean;
+  available: boolean;
+  latest: UpdateRelease | null;
+  checked_at: number;
+  error: string | null;
+  /** versione da cui si è appena aggiornato (24 ore) */
+  updated_from: string | null;
+}
+
 export interface CertInfo {
   host: string;
   status: "valid" | "expiring" | "expired" | "missing" | "error" | "issuing";
@@ -166,11 +187,12 @@ export interface PanelState {
   /** canali di notifica attivi il cui ultimo invio è fallito (solo con notifications:manage) */
   notify_failing?: string[];
   https_listening: boolean;
+  update: UpdateInfo;
   certs: CertInfo[];
   recheck_minutes: number;
   recheck_verified_minutes: number;
   panel: {
-    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings; admin_host: string | null };
+    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings; admin_host: string | null; updates: { check: boolean; prerelease: boolean } };
     domains: DomainInfo[];
     buckets: BucketInfo[];
     rules: RuleInfo[];
@@ -360,6 +382,8 @@ export const api = {
     post<RuleInfo>("/api/rules", r),
   setAdminHost: (host: string | null) =>
     request<{ host: string | null; url: string | null; warnings: string[] }>("/api/admin-host", "PUT", { host }),
+  saveUpdates: (check: boolean, prerelease: boolean) => request<UpdateInfo>("/api/updates", "PUT", { check, prerelease }),
+  checkUpdate: () => post<UpdateInfo>("/api/update/check"),
   saveHttps: (b: AcmeSettings) => request<AcmeSettings>("/api/https", "PUT", b),
   issueCert: (host: string) => post<{ started: boolean }>("/api/certs/issue", { host }),
   uploadCert: (host: string, chain: string, key: string) =>

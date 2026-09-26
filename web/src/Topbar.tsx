@@ -73,6 +73,7 @@ const HELP: Record<PageId, [string, string][]> = {
     ["Soglie e ripristino", "guide/notifications#soglie-attesa-e-ripristino"],
   ],
   settings: [
+    ["Aggiornamenti", "guide/upgrades-backup#aggiornare"],
     ["Porte standard", "guide/install#porte-standard"],
     ["Variabili d'ambiente", "reference/environment"],
     ["HTTPS e proxy", "guide/https-proxy"],

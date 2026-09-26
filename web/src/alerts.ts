@@ -42,6 +42,23 @@ export function buildAlerts(s: PanelState, can: (scope: string) => boolean): Ale
       text: "L’ultimo invio è fallito: controlla le impostazioni e premi «Invia prova».",
       page: "notifications",
     });
+  const u = s.update;
+  if (u?.available && u.latest && can("settings:write"))
+    out.push({
+      id: `u:${u.latest.version}`,
+      level: "info",
+      title: `Nuova versione disponibile · ${u.latest.version}`,
+      text: `Stai usando la ${u.current}. Vedi come aggiornare in Impostazioni → Aggiornamenti.`,
+      page: "settings",
+    });
+  if (u?.updated_from)
+    out.push({
+      id: `u:done:${u.current}`,
+      level: "info",
+      title: `Aggiornato alla versione ${u.current}`,
+      text: `Prima era la ${u.updated_from}. Le novità sono nelle note della release.`,
+      page: "settings",
+    });
   const now = Date.now() / 1000;
   if (s.panel.settings.acme.enabled)
     for (const c of can("domains:read") ? s.certs : []) {

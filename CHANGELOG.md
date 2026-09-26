@@ -5,6 +5,9 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e i
 ## [Non rilasciato]
 
 ### Aggiunto
+- **Controllo delle nuove versioni**: una richiesta al giorno alle release di GitHub (spegnibile, `OTR_UPDATE_CHECK=off`), avviso nella campanella, scheda *Aggiornamenti* in Impostazioni con i passi per Docker, servizio, binario e sorgenti, avviso «aggiornato da A a B». Nuova pagina della guida per Docker (tag, Compose, Watchtower).
+
+### Aggiunto
 - **Pannello in HTTPS**: il pannello si può servire anche su un dominio del nodo con il suo certificato (Impostazioni → Pannello in HTTPS), con redirect da HTTP, cookie `Secure` e la porta locale sempre attiva.
 
 ## [0.1.0] - 2026-09-26
