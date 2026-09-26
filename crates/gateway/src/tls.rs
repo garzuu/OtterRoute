@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn short_lived_certificates_do_not_renew_in_a_loop() {
-        let info = |lifetime_days: u64, left_days: u64| CertInfo {
+        let info = |lifetime_days: u64| CertInfo {
             host: "a.example.com".into(),
             issued_at: Some(1_000_000),
             not_after: Some(1_000_000 + lifetime_days * 86400),
@@ -465,17 +465,15 @@ mod tests {
         };
         let at = |days_since_issue: u64| 1_000_000 + days_since_issue * 86400;
         // 90 giorni: come prima (rinnovo a 30 giorni dalla scadenza, "in scadenza" a 14)
-        assert!(
-            !needs_issue(&info(90, 0), true, at(59)) && needs_issue(&info(90, 0), true, at(61))
-        );
-        assert_eq!(status(&info(90, 0), at(60)), "valid");
-        assert_eq!(status(&info(90, 0), at(77)), "expiring");
+        assert!(!needs_issue(&info(90), true, at(59)) && needs_issue(&info(90), true, at(61)));
+        assert_eq!(status(&info(90), at(60)), "valid");
+        assert_eq!(status(&info(90), at(77)), "expiring");
         // 6 giorni: si rinnova solo nell'ultimo terzo, e non è "in scadenza" appena emesso
-        assert_eq!(status(&info(6, 0), at(0)), "valid");
-        assert!(!needs_issue(&info(6, 0), true, at(1)));
-        assert!(needs_issue(&info(6, 0), true, at(5)));
-        assert_eq!(status(&info(6, 0), at(5)), "expiring");
-        assert_eq!(status(&info(6, 0), at(7)), "expired");
+        assert_eq!(status(&info(6), at(0)), "valid");
+        assert!(!needs_issue(&info(6), true, at(1)));
+        assert!(needs_issue(&info(6), true, at(5)));
+        assert_eq!(status(&info(6), at(5)), "expiring");
+        assert_eq!(status(&info(6), at(7)), "expired");
     }
 
     #[test]
