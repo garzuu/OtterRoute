@@ -1,13 +1,13 @@
 import { useState, type ReactNode } from "react";
 import type { MetricsRange, MetricsResponse } from "./api";
+import { loc } from "./i18n";
 import { fmtBytes } from "./ui";
 
-const nf = new Intl.NumberFormat("it-IT");
-export const fmtNum = (n: number) => nf.format(n);
-export const fmtPct = (v: number | null) => (v === null ? "—" : `${(v * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%`);
+export const fmtNum = (n: number) => new Intl.NumberFormat(loc()).format(n);
+export const fmtPct = (v: number | null) => (v === null ? "—" : `${(v * 100).toLocaleString(loc(), { maximumFractionDigits: 1 })}%`);
 /** Le latenze arrivano come limite superiore della fascia; oltre l'ultima fascia il valore è "enorme". */
 export const fmtMs = (v: number | null) =>
-  v === null ? "—" : v > 1e9 ? "> 2,5 s" : v >= 1000 ? `${(v / 1000).toLocaleString("it-IT")} s` : `≤ ${v} ms`;
+  v === null ? "—" : v > 1e9 ? "> 2,5 s" : v >= 1000 ? `${(v / 1000).toLocaleString(loc())} s` : `≤ ${v} ms`;
 
 /** Estremo "tondo" per l'asse verticale. */
 function niceMax(v: number): number {
@@ -19,16 +19,16 @@ function niceMax(v: number): number {
 
 function timeLabel(t: number, range: MetricsRange): string {
   const d = new Date(t * 1000);
-  if (range === "1h") return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-  if (range === "24h") return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+  if (range === "1h") return d.toLocaleTimeString(loc(), { hour: "2-digit", minute: "2-digit" });
+  if (range === "24h") return d.toLocaleTimeString(loc(), { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString(loc(), { day: "2-digit", month: "2-digit" });
 }
 
 function tipLabel(t: number, range: MetricsRange): string {
   const d = new Date(t * 1000);
   return range === "1h"
-    ? d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    ? d.toLocaleTimeString(loc(), { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleString(loc(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 /** Richieste nel tempo, a barre impilate: HIT / MISS / altro. */

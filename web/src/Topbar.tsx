@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Alert } from "./alerts";
 import { ROLE_LABEL } from "./auth";
+import { LangSwitch, useT } from "./i18n";
 import { docsHref } from "./ui";
 import type { PageId } from "./Dashboard";
 import { IconBell, IconCheck, IconChevronDown, IconLogout, IconMenu, IconUser } from "./icons";
@@ -103,6 +104,7 @@ export function Topbar(props: {
   onProfile: () => void;
   onLogout: () => void;
 }) {
+  const t = useT();
   const help = usePopover();
   const bell = usePopover();
   const user = usePopover();
@@ -237,10 +239,11 @@ export function Topbar(props: {
                 props.onProfile();
               }}
             >
-              <IconUser /> Il mio profilo
+              <IconUser /> {t("menu.profile")}
             </button>
+            <LangSwitch />
             <button className="pop-item" onClick={props.onLogout}>
-              <IconLogout /> Esci
+              <IconLogout /> {t("menu.logout")}
             </button>
           </Popover>
         )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, domainStatus, type CertInfo, type CheckResult, type DomainInfo, type PanelState } from "../api";
+import { loc } from "../i18n";
 import { useAuth } from "../auth";
 import { DataTable, type Column } from "../DataTable";
 import { DeleteButton, EmptyState, Field, Illus, Modal, Page, Stages, fmtTime } from "../ui";
@@ -13,7 +14,7 @@ const CERT_BADGE: Record<CertInfo["status"], { cls: string; label: string }> = {
   issuing: { cls: "badge warn", label: "In emissione" },
 };
 
-const fmtDay = (unix: number) => new Date(unix * 1000).toLocaleDateString("it-IT");
+const fmtDay = (unix: number) => new Date(unix * 1000).toLocaleDateString(loc());
 
 /** Certificato HTTPS di un dominio, redirect e caricamento manuale. */
 function HttpsPanel(props: { d: DomainInfo; cert: CertInfo | undefined; auto: boolean; canWrite: boolean; run: (key: string, fn: () => Promise<unknown>) => Promise<void>; busy: string | null }) {

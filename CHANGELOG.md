@@ -4,6 +4,7 @@
 - Guida: dietro Cloudflare (nuvola arancione) l'emissione ACME non «fallisce» sempre; riesce se la sfida non viene reindirizzata a HTTPS. Aggiunti i passi per farla passare.
 
 ### Aggiunto
+- Interfaccia multilingua, prima fase: modulo di traduzione interno (`web/src/i18n`), selettore IT/EN nel menu utente (lingua del browser al primo accesso, poi scelta salvata), date e numeri nel formato della lingua. Tradotta per ora la pagina *Il mio profilo*; le altre pagine seguono.
 - **Backup e ripristino dal pannello**: un file `.otrbak` cifrato (AES-256-GCM, Argon2id) con utenti, chiavi, certificati e configurazione; ripristino con controllo preventivo, rifiuto di backup di versioni più recenti, copia dello stato precedente e riavvio del nodo. Scope `users:manage`.
 - **Notifiche** (email/Telegram) anche per nuove versioni, rollback di un aggiornamento e certificati in scadenza o scaduti, compresi quelli caricati a mano. Le notifiche di versione seguono l'interruttore del controllo aggiornamenti.
 - **Indirizzi ammessi per il pannello in HTTPS**: elenco di IP e reti CIDR (Impostazioni → Pannello in HTTPS, `PUT /api/admin-allow`); gli altri ricevono 404, la porta locale resta sempre aperta e dal pannello HTTPS non ci si può escludere da soli.
