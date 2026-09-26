@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { api, domainStatus, type CertInfo, type CheckResult, type DomainInfo, type PanelState } from "../api";
-import { loc } from "../i18n";
+import { loc, rich, tr } from "../i18n";
 import { useAuth } from "../auth";
 import { DataTable, type Column } from "../DataTable";
 import { DeleteButton, EmptyState, Field, Illus, Modal, Page, Stages, fmtTime } from "../ui";
 
-const CERT_BADGE: Record<CertInfo["status"], { cls: string; label: string }> = {
-  valid: { cls: "badge good", label: "Valido" },
-  expiring: { cls: "badge warn", label: "In scadenza" },
-  expired: { cls: "badge bad", label: "Scaduto" },
-  missing: { cls: "badge", label: "Non emesso" },
-  error: { cls: "badge bad", label: "Errore" },
-  issuing: { cls: "badge warn", label: "In emissione" },
+// le etichette sono getter: si leggono al momento dell'uso e seguono la lingua
+const CERT_BADGE: Record<CertInfo["status"], { cls: string; readonly label: string }> = {
+  valid: { cls: "badge good", get label() { return tr("dm.cValid"); } },
+  expiring: { cls: "badge warn", get label() { return tr("dm.cExpiring"); } },
+  expired: { cls: "badge bad", get label() { return tr("dm.cExpired"); } },
+  missing: { cls: "badge", get label() { return tr("dm.cMissing"); } },
+  error: { cls: "badge bad", get label() { return tr("bk2.error"); } },
+  issuing: { cls: "badge warn", get label() { return tr("dm.cIssuing"); } },
 };
 
 const fmtDay = (unix: number) => new Date(unix * 1000).toLocaleDateString(loc());
@@ -29,22 +30,22 @@ function HttpsPanel(props: { d: DomainInfo; cert: CertInfo | undefined; auto: bo
       {cert ? (
         <div>
           <span className={CERT_BADGE[cert.status].cls}>{CERT_BADGE[cert.status].label}</span>{" "}
-          {cert.not_after && <span className="muted">scade il {fmtDay(cert.not_after)}</span>}
+          {cert.not_after && <span className="muted">{tr("dm.expires", { date: fmtDay(cert.not_after) })}</span>}
           {cert.error && <div className="box bad">{cert.error.message}</div>}
         </div>
       ) : (
-        <div className="muted">Un certificato pubblico non è possibile per questo nome (dominio locale o indirizzo IP).</div>
+        <div className="muted">{tr("dm.noPublicCert")}</div>
       )}
-      {!auto && <div className="muted">I certificati automatici sono spenti: attivali in Impostazioni → HTTPS, oppure carica un certificato tuo.</div>}
+      {!auto && <div className="muted">{tr("dm.autoOff")}</div>}
       {canWrite && (
         <div className="inline tight">
           {auto && cert && d.verified && (
             <button className="secondary small" disabled={busy === `cert:${d.host}` || cert.status === "issuing"} onClick={() => run(`cert:${d.host}`, () => api.issueCert(d.host))}>
-              {cert.status === "issuing" ? "In emissione…" : serving ? "Rinnova ora" : "Richiedi certificato"}
+              {cert.status === "issuing" ? tr("dm.issuingNow") : serving ? tr("dm.renew") : tr("dm.request")}
             </button>
           )}
           <button className="ghost small" onClick={() => setOpen(!open)}>
-            {open ? "Chiudi" : "Carica un certificato"}
+            {open ? tr("common.close") : tr("dm.upload")}
           </button>
         </div>
       )}
@@ -52,16 +53,16 @@ function HttpsPanel(props: { d: DomainInfo; cert: CertInfo | undefined; auto: bo
         <label className="check">
           <input type="checkbox" checked={d.redirect_https} disabled={(!serving && !d.redirect_https) || busy === `redir:${d.host}`} onChange={(e) => run(`redir:${d.host}`, () => api.setRedirect(d.host, e.target.checked))} />
           <span>
-            Reindirizza l’HTTP a HTTPS per questo dominio {serving ? "" : "(disponibile dopo aver ottenuto un certificato)"}. La verifica del dominio resta in HTTP.
+            {tr("dm.redirect", { note: serving ? "" : tr("dm.redirectNote") })}
           </span>
         </label>
       )}
       {open && canWrite && (
         <div>
-          <Field label="Certificato e catena (PEM)">
+          <Field label={tr("dm.chain")}>
             <textarea rows={4} value={chain} onChange={(e) => setChain(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----" spellCheck={false} />
           </Field>
-          <Field label="Chiave privata (PEM)" hint="Resta su questo nodo, in un file leggibile solo dal proprietario.">
+          <Field label={tr("dm.key")} hint={tr("dm.keyHint")}>
             <textarea rows={4} value={key} onChange={(e) => setKey(e.target.value)} placeholder="-----BEGIN PRIVATE KEY-----" spellCheck={false} />
           </Field>
           <button
@@ -76,7 +77,7 @@ function HttpsPanel(props: { d: DomainInfo; cert: CertInfo | undefined; auto: bo
               })
             }
           >
-            Carica
+            {tr("dm.uploadBtn")}
           </button>
         </div>
       )}
@@ -87,10 +88,10 @@ function HttpsPanel(props: { d: DomainInfo; cert: CertInfo | undefined; auto: bo
 const isLocal = (h: string) => h === "localhost" || h.endsWith(".localhost");
 
 export const DOMAIN_BADGE = {
-  pending: { cls: "badge warn", label: "In attesa" },
-  verified: { cls: "badge good", label: "Verificato" },
-  dns_error: { cls: "badge bad", label: "Errore DNS" },
-  unreachable: { cls: "badge bad", label: "Nodo non raggiungibile" },
+  pending: { cls: "badge warn", get label() { return tr("dm.pending"); } },
+  verified: { cls: "badge good", get label() { return tr("dm.verified"); } },
+  dns_error: { cls: "badge bad", get label() { return tr("dm.dnsError"); } },
+  unreachable: { cls: "badge bad", get label() { return tr("dm.unreachable"); } },
 } as const;
 
 /** Cosa deve succedere perché il dominio sia valido. */
@@ -98,20 +99,16 @@ function Hint(props: { host: string; port: number }) {
   if (isLocal(props.host)) return null;
   return (
     <div className="dnsbox">
-      <div>
-        Il dominio deve <strong>risolvere</strong> e le richieste sulla porta <code>{props.port}</code> devono{" "}
-        <strong>arrivare a questo nodo</strong>, con l’instradamento che preferisci (proxy, load balancer, tunnel,
-        port forwarding). Il nodo non deve avere un IP particolare.
-      </div>
+      <div>{rich(tr("dm.hint1", { port: props.port }))}</div>
       <div className="muted">
-        Per provare a mano da qualunque macchina (deve rispondere <code>{"{"}"otterroute":true…{"}"}</code>):
+        {tr("dm.hint2", { json: '{"otterroute":true…}' })}
         <br />
         <code>
           curl -s http://{props.host}
           {props.port === 80 ? "" : `:${props.port}`}/.well-known/otterroute/check?nonce=prova
         </code>
       </div>
-      <div className="muted">La propagazione DNS può richiedere fino a 48 ore.</div>
+      <div className="muted">{tr("dm.hint3")}</div>
     </div>
   );
 }
@@ -143,13 +140,13 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
   const columns: Column<DomainInfo>[] = [
     {
       key: "host",
-      header: "Dominio",
+      header: tr("dm.colDomain"),
       sort: (d) => d.host,
       render: (d) => <code className="big">{d.host}</code>,
     },
     {
       key: "status",
-      header: "Stato",
+      header: tr("bk2.colStatus"),
       sort: (d) => DOMAIN_BADGE[domainStatus(d)].label,
       render: (d) => {
         const b = DOMAIN_BADGE[domainStatus(d)];
@@ -165,7 +162,7 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
         if (!c) return <span className="muted">—</span>;
         const b = CERT_BADGE[c.status];
         return (
-          <span className={b.cls} title={c.not_after ? `Scade il ${fmtDay(c.not_after)}` : undefined}>
+          <span className={b.cls} title={c.not_after ? tr("dm.expiresCap", { date: fmtDay(c.not_after) }) : undefined}>
             {b.label}
           </span>
         );
@@ -173,12 +170,12 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
     },
     {
       key: "records",
-      header: "Risolve a",
+      header: tr("dm.colResolves"),
       render: (d) => (d.records.length ? <code className="small-text">{d.records.slice(0, 2).join(", ")}</code> : <span className="muted">—</span>),
     },
     {
       key: "since",
-      header: "Da",
+      header: tr("dm.colSince"),
       sort: (d) => d.since ?? "",
       render: (d) => <span className="muted">{d.since ? fmtTime(d.since) : "—"}</span>,
     },
@@ -186,17 +183,16 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
 
   return (
     <Page
-      title="Domini"
-     
-      lead="Censisci i domini che instradi verso questo nodo. Un dominio è utilizzabile solo dopo aver verificato che risolva e che arrivi davvero qui."
+      title={tr("nav.domains")}
+      lead={tr("dm.lead")}
     >
       {err && <div className="box bad">{err}</div>}
       <div className="card">
         <div className="head">
-          <h2>Domini censiti</h2>
+          <h2>{tr("dm.registered")}</h2>
           {canWrite && domains.length > 0 && (
             <button className="primary small" onClick={() => setAdding(true)}>
-              Nuovo dominio
+              {tr("dm.new")}
             </button>
           )}
         </div>
@@ -207,19 +203,19 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
           empty={
             <EmptyState
               image="search"
-              title="Ancora nessun dominio"
-              text="Censisci un dominio per verificare che risolva e che arrivi a questo nodo."
-              action={canWrite ? { label: "Nuovo dominio", onClick: () => setAdding(true) } : undefined}
+              title={tr("dm.none")}
+              text={tr("dm.noneText")}
+              action={canWrite ? { label: tr("dm.new"), onClick: () => setAdding(true) } : undefined}
             />
           }
           searchText={(d) => `${d.host} ${DOMAIN_BADGE[domainStatus(d)].label}`}
-          searchPlaceholder="Cerca dominio…"
+          searchPlaceholder={tr("dm.search")}
           initialSort={{ key: "host", dir: "asc" }}
           defaultExpanded={(d) => domainStatus(d) !== "verified"}
           actions={!canWrite ? undefined : (d) => (
             <>
               <button className="secondary small" onClick={() => run(`check:${d.host}`, () => api.checkDomain(d.host))} disabled={busy === `check:${d.host}`}>
-                {busy === `check:${d.host}` ? "Controllo…" : "Ricontrolla"}
+                {busy === `check:${d.host}` ? tr("bk2.checking") : tr("bk2.recheck")}
               </button>
               <DeleteButton onConfirm={() => run(`del:${d.host}`, () => api.deleteDomain(d.host))} />
             </>
@@ -231,10 +227,7 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
                 {(status === "dns_error" || status === "unreachable") && (
                   <div className="box bad">
                     {d.message}
-                    <div className="small-text">
-                      Il dominio era valido e ora non lo è più. Gli instradamenti continuano a essere serviti, ma
-                      controlla il DNS e il tuo instradamento verso il nodo.
-                    </div>
+                    <div className="small-text">{tr("dm.wasValid")}</div>
                   </div>
                 )}
                 {d.stages.length > 0 ? <Stages stages={d.stages} /> : <div className="muted">{d.message}</div>}
@@ -301,14 +294,14 @@ export function DomainForm(props: { state: PanelState; onCancel?: () => void; ca
           void test();
         }}
       >
-        <Field label="Dominio">
+        <Field label={tr("dm.colDomain")}>
           <input
             value={host}
             onChange={(e) => {
               setHost(e.target.value);
               setResult(null);
             }}
-            placeholder="media.azienda.it"
+            placeholder={tr("dm.placeholder")}
             spellCheck={false}
             autoFocus
           />
@@ -316,7 +309,7 @@ export function DomainForm(props: { state: PanelState; onCancel?: () => void; ca
         {host.trim() && <Hint host={host.trim().toLowerCase()} port={state.http_port} />}
         <div className="mt">
           <button className="secondary" disabled={!host.trim() || busy !== null}>
-            {busy === "test" ? "Verifico…" : "Verifica configurazione"}
+            {busy === "test" ? tr("bk2.verifying") : tr("dm.verify")}
           </button>
         </div>
       </form>
@@ -328,10 +321,10 @@ export function DomainForm(props: { state: PanelState; onCancel?: () => void; ca
             {shown.ok ? (
               <>
                 <Illus name="verified" width={44} />
-                <span>Il dominio arriva a questo nodo.</span>
+                <span>{tr("dm.reaches")}</span>
               </>
             ) : (
-              "Non ancora raggiungibile. Puoi censirlo ora: il nodo lo ricontrolla da solo e diventa utilizzabile appena passa la verifica."
+              tr("dm.notYet")
             )}
           </div>
         </>
@@ -340,13 +333,13 @@ export function DomainForm(props: { state: PanelState; onCancel?: () => void; ca
       <div className="nav">
         {props.onCancel ? (
           <button className="ghost" onClick={props.onCancel}>
-            {props.cancelLabel ?? "Annulla"}
+            {props.cancelLabel ?? tr("common.cancel")}
           </button>
         ) : (
           <span />
         )}
         <button className="primary" onClick={save} disabled={!host.trim() || busy !== null}>
-          {busy === "save" ? "Salvo…" : shown && !shown.ok ? "Censisci comunque" : "Censisci dominio"}
+          {busy === "save" ? tr("common.saving") : shown && !shown.ok ? tr("dm.saveAnyway") : tr("dm.register")}
         </button>
       </div>
     </>
@@ -355,7 +348,7 @@ export function DomainForm(props: { state: PanelState; onCancel?: () => void; ca
 
 function NewDomain(props: { state: PanelState; onClose: () => void; onSaved: () => Promise<void> }) {
   return (
-    <Modal title="Nuovo dominio" onClose={props.onClose}>
+    <Modal title={tr("dm.new")} onClose={props.onClose}>
       <DomainForm state={props.state} onCancel={props.onClose} onSaved={props.onSaved} />
     </Modal>
   );

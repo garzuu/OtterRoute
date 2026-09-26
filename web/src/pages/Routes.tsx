@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, domainStatus, type PanelState, type ProbeResult, type RuleInfo, type WarmResult } from "../api";
-import { loc } from "../i18n";
+import { loc, rich, tr, type Key } from "../i18n";
 import { useAuth } from "../auth";
 import { DataTable, type Column } from "../DataTable";
 import type { PageId } from "../Dashboard";
@@ -27,7 +27,7 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
   const columns: Column<RuleInfo>[] = [
     {
       key: "address",
-      header: "Indirizzo",
+      header: tr("rt.colAddress"),
       sort: (x) => `${x.domain}${x.path_prefix}`,
       render: (x) => (
         <code className="big">
@@ -38,7 +38,7 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
     },
     {
       key: "origin",
-      header: "Origine",
+      header: tr("rt.colOrigin"),
       sort: (x) => `${bucketOf(x)?.bucket ?? ""}/${x.folder}`,
       render: (x) => (
         <code>
@@ -48,24 +48,24 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
     },
     {
       key: "storage",
-      header: "Bucket censito",
+      header: tr("rt.colBucket"),
       sort: (x) => bucketOf(x)?.name ?? "",
       render: (x) => bucketOf(x)?.name ?? <span className="muted">—</span>,
     },
     {
       key: "access",
-      header: "Accesso",
+      header: tr("rt.colAccess"),
       sort: (x) => (x.signed ? "1" : "0"),
       render: (x) => (
         <>
-          {x.signed ? <span className="badge warn">Link firmati</span> : <span className="badge">Pubblico</span>}{" "}
-          {x.images && <span className="badge good">Immagini</span>}
+          {x.signed ? <span className="badge warn">{tr("rt.signed")}</span> : <span className="badge">{tr("rt.public")}</span>}{" "}
+          {x.images && <span className="badge good">{tr("rt.images")}</span>}
         </>
       ),
     },
     {
       key: "domain",
-      header: "Dominio",
+      header: tr("dm.colDomain"),
       sort: (x) => {
         const d = domainOf(x);
         return d ? DOMAIN_BADGE[domainStatus(d)].label : "";
@@ -80,14 +80,14 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
   ];
 
   return (
-    <Page title="Instradamenti" lead="Collega un dominio verificato (e un prefisso) a un bucket censito e a una cartella.">
+    <Page title={tr("nav.routes")} lead={tr("rt.lead")}>
       {err && <div className="box bad">{err}</div>}
       <div className="card">
         <div className="head">
-          <h2>Instradamenti attivi</h2>
+          <h2>{tr("rt.active")}</h2>
           {canWrite && rules.length > 0 && (
             <button className="primary small" onClick={() => setAdding(true)}>
-              Nuovo instradamento
+              {tr("rt.new")}
             </button>
           )}
         </div>
@@ -98,13 +98,13 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
           empty={
             <EmptyState
               image="laptop"
-              title="Ancora nessun instradamento"
-              text="Collega un dominio verificato a un bucket: da quel momento i file vengono serviti con la cache."
-              action={canWrite ? { label: "Nuovo instradamento", onClick: () => setAdding(true) } : undefined}
+              title={tr("rt.none")}
+              text={tr("rt.noneText")}
+              action={canWrite ? { label: tr("rt.new"), onClick: () => setAdding(true) } : undefined}
             />
           }
           searchText={(x) => `${x.domain}${x.path_prefix} ${bucketOf(x)?.name ?? ""} ${bucketOf(x)?.bucket ?? ""} ${x.folder}`}
-          searchPlaceholder="Cerca instradamento…"
+          searchPlaceholder={tr("rt.search")}
           initialSort={{ key: "address", dir: "asc" }}
           actions={!canWrite ? undefined : (x) => (
             <DeleteButton
@@ -180,18 +180,17 @@ export function RuleForm(props: { state: PanelState; go: (p: PageId) => void; on
         <div className="box warn">
           {verified.length === 0 && (
             <div>
-              Serve almeno un <strong>dominio verificato</strong>
-              {pending > 0 ? ` (${pending} in attesa)` : ""}.{" "}
+              {rich(tr("rt.needDomain", { pending: pending > 0 ? tr("rt.pendingN", { n: pending }) : "" }))}
               <button className="link" onClick={() => go("domains")}>
-                Vai ai domini
+                {tr("rt.goDomains")}
               </button>
             </div>
           )}
           {buckets.length === 0 && (
             <div>
-              Serve almeno un <strong>bucket</strong>.{" "}
+              {rich(tr("rt.needBucket"))}
               <button className="link" onClick={() => go("buckets")}>
-                Vai ai bucket
+                {tr("rt.goBuckets")}
               </button>
             </div>
           )}
@@ -199,7 +198,7 @@ export function RuleForm(props: { state: PanelState; go: (p: PageId) => void; on
       ) : (
         <>
           <div className="row">
-            <Field label="Dominio" hint={pending > 0 ? `${pending} dominio/i in attesa di verifica non compaiono.` : undefined}>
+            <Field label={tr("dm.colDomain")} hint={pending > 0 ? tr("rt.pendingHint", { n: pending }) : undefined}>
               <select value={dom} onChange={(e) => setDomain(e.target.value)}>
                 {verified.map((d) => (
                   <option key={d.host} value={d.host}>
@@ -208,12 +207,12 @@ export function RuleForm(props: { state: PanelState; go: (p: PageId) => void; on
                 ))}
               </select>
             </Field>
-            <Field label="Prefisso del percorso" hint="/ = tutto il dominio.">
+            <Field label={tr("rt.prefix")} hint={tr("rt.prefixHint")}>
               <input value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="/" spellCheck={false} />
             </Field>
           </div>
           <div className="row">
-            <Field label="Bucket">
+            <Field label={tr("nav.buckets")}>
               <select value={bkt} onChange={(e) => setBucketId(e.target.value)}>
                 {buckets.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -222,7 +221,7 @@ export function RuleForm(props: { state: PanelState; go: (p: PageId) => void; on
                 ))}
               </select>
             </Field>
-            <Field label="Cartella (opzionale)" hint="Tutto ciò che sta fuori resta privato.">
+            <Field label={tr("rt.folder")} hint={tr("rt.folderHint")}>
               <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="foto/" spellCheck={false} />
             </Field>
           </div>
@@ -248,13 +247,13 @@ export function RuleForm(props: { state: PanelState; go: (p: PageId) => void; on
       <div className="nav">
         {props.onCancel ? (
           <button className="ghost" onClick={props.onCancel}>
-            {props.cancelLabel ?? "Annulla"}
+            {props.cancelLabel ?? tr("common.cancel")}
           </button>
         ) : (
           <span />
         )}
         <button className="primary" onClick={create} disabled={blocked || busy || !dom || !bkt}>
-          {busy ? "Creo…" : "Crea instradamento"}
+          {busy ? tr("rt.creating") : tr("rt.create")}
         </button>
       </div>
     </>
@@ -263,18 +262,18 @@ export function RuleForm(props: { state: PanelState; go: (p: PageId) => void; on
 
 function NewRule(props: { state: PanelState; go: (p: PageId) => void; onClose: () => void; onSaved: () => Promise<void> }) {
   return (
-    <Modal title="Nuovo instradamento" onClose={props.onClose}>
+    <Modal title={tr("rt.new")} onClose={props.onClose}>
       <RuleForm state={props.state} go={props.go} onCancel={props.onClose} onSaved={props.onSaved} />
     </Modal>
   );
 }
 
-const TTLS: [string, number][] = [
-  ["5 minuti", 300],
-  ["1 ora", 3600],
-  ["24 ore", 86400],
-  ["7 giorni", 604800],
-  ["30 giorni", 2592000],
+const TTLS: [Key, number][] = [
+  ["rt.ttl300", 300],
+  ["rt.ttl3600", 3600],
+  ["rt.ttl86400", 86400],
+  ["rt.ttl604800", 604800],
+  ["rt.ttl2592000", 2592000],
 ];
 
 /** Link firmati con scadenza: attivazione per instradamento e creazione dei link. */
@@ -305,7 +304,7 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
 
   return (
     <div className="details">
-      <strong>Accesso e immagini</strong>
+      <strong>{tr("rt.accessImages")}</strong>
       <label className="check">
         <input
           type="checkbox"
@@ -320,7 +319,7 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
           }
         />
         <span>
-          I file di questo instradamento si aprono solo con un <strong>link firmato e con scadenza</strong>. Senza, il nodo risponde 403 (anche per i file già in cache).
+          {rich(tr("rt.signedText"))}
         </span>
       </label>
       <label className="check">
@@ -336,17 +335,17 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
           }
         />
         <span>
-          <strong>Immagini al volo</strong>: i file JPEG, PNG, GIF e WebP si ridimensionano e si convertono con <code>?w=800&amp;h=600&amp;fit=cover&amp;fmt=webp&amp;q=80</code> (<code>fmt=auto</code> sceglie WebP se il browser lo accetta). Le varianti restano in cache; l’originale non si modifica.
+          {rich(tr("rt.imagesText"))}
         </span>
       </label>
       {r.signed && (
         <>
           <div className="inline tight">
-            <input value={file} onChange={(e) => setFile(e.target.value)} placeholder="file, es. barca.jpg" aria-label="File del link" spellCheck={false} />
-            <select value={ttl} onChange={(e) => setTtl(Number(e.target.value))} aria-label="Validità" style={{ width: "auto" }}>
+            <input value={file} onChange={(e) => setFile(e.target.value)} placeholder={tr("rt.filePh")} aria-label={tr("rt.linkFileAria")} spellCheck={false} />
+            <select value={ttl} onChange={(e) => setTtl(Number(e.target.value))} aria-label={tr("rt.validityAria")} style={{ width: "auto" }}>
               {TTLS.map(([l, s]) => (
                 <option key={s} value={s}>
-                  Valido {l}
+                  {tr("rt.valid", { l: tr(l) })}
                 </option>
               ))}
             </select>
@@ -360,20 +359,20 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
                 })
               }
             >
-              Crea link
+              {tr("rt.makeLink")}
             </button>
           </div>
           <label className="check">
             <input type="checkbox" checked={https} onChange={(e) => setHttps(e.target.checked)} />
-            <span>Usa https:// nell’indirizzo (se davanti al nodo c’è un proxy con HTTPS)</span>
+            <span>{tr("rt.https")}</span>
           </label>
           {link && (
             <div className="box good">
               <div>
-                Scade il <strong>{new Date(link.expires_at * 1000).toLocaleString(loc())}</strong>
+                {rich(tr("rt.expires", { date: new Date(link.expires_at * 1000).toLocaleString(loc()) }))}
               </div>
               <div className="inline tight">
-                <input readOnly value={link.url} aria-label="Link firmato" onFocus={(e) => e.currentTarget.select()} />
+                <input readOnly value={link.url} aria-label={tr("rt.linkAria")} onFocus={(e) => e.currentTarget.select()} />
                 <button
                   className="secondary small"
                   onClick={async () => {
@@ -381,11 +380,11 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
                       await navigator.clipboard.writeText(link.url);
                       setCopied(true);
                     } catch {
-                      setMsg({ ok: false, text: "Copia non riuscita: seleziona il link a mano." });
+                      setMsg({ ok: false, text: tr("rt.copyFail") });
                     }
                   }}
                 >
-                  {copied ? "Copiato ✓" : "Copia"}
+                  {copied ? tr("rt.copied") : tr("common.copy")}
                 </button>
               </div>
             </div>
@@ -402,22 +401,22 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
                         await api.rotateLinks();
                         setArmed(false);
                         setLink(null);
-                        setMsg({ ok: true, text: "Chiave ruotata: tutti i link emessi finora non valgono più." });
+                        setMsg({ ok: true, text: tr("rt.rotated") });
                       })
                     }
                   >
-                    Conferma: invalida tutti i link
+                    {tr("rt.rotateConfirm")}
                   </button>
                   <button className="ghost small" onClick={() => setArmed(false)}>
-                    Annulla
+                    {tr("common.cancel")}
                   </button>
                 </>
               ) : (
                 <button className="ghost small" onClick={() => setArmed(true)} disabled={busy}>
-                  Ruota la chiave
+                  {tr("rt.rotate")}
                 </button>
               )}
-              <span className="muted small-text">Vale per tutti gli instradamenti del nodo.</span>
+              <span className="muted small-text">{tr("rt.rotateNote")}</span>
             </div>
           )}
         </>
@@ -457,20 +456,20 @@ function CachePanel(props: { r: RuleInfo }) {
 
   return (
     <div className="details">
-      <strong>Cache</strong>
+      <strong>{tr("rt.cache")}</strong>
       <div className="inline tight">
-        <input value={file} onChange={(e) => setFile(e.target.value)} placeholder="file da svuotare, es. barca.jpg" aria-label="File da svuotare" spellCheck={false} />
+        <input value={file} onChange={(e) => setFile(e.target.value)} placeholder={tr("rt.purgePh")} aria-label={tr("rt.purgeAria")} spellCheck={false} />
         <button
           className="secondary small"
           disabled={busy !== null || !file.trim()}
           onClick={() =>
             run("file", async () => {
               const res = await api.purgeCache(r.id, full(file));
-              setMsg({ ok: true, text: res.removed ? "Copia rimossa: la prossima richiesta la rilegge dallo storage." : "Quel file non era in cache." });
+              setMsg({ ok: true, text: res.removed ? tr("rt.removed") : tr("rt.notCached") });
             })
           }
         >
-          Svuota file
+          {tr("rt.purgeFile")}
         </button>
         {armed ? (
           <>
@@ -481,23 +480,23 @@ function CachePanel(props: { r: RuleInfo }) {
                 run("all", async () => {
                   await api.purgeCache(r.id);
                   setArmed(false);
-                  setMsg({ ok: true, text: "Cache dell’instradamento svuotata." });
+                  setMsg({ ok: true, text: tr("rt.purgedAll") });
                 })
               }
             >
-              Conferma
+              {tr("common.confirm")}
             </button>
             <button className="ghost small" onClick={() => setArmed(false)}>
-              Annulla
+              {tr("common.cancel")}
             </button>
           </>
         ) : (
           <button className="secondary small" onClick={() => setArmed(true)} disabled={busy !== null}>
-            Svuota tutto
+            {tr("rt.purgeAll")}
           </button>
         )}
       </div>
-      <textarea rows={3} value={list} onChange={(e) => setList(e.target.value)} placeholder={"file da precaricare, uno per riga (max 200)\nbarca.jpg\nfoto/mare.jpg"} spellCheck={false} aria-label="File da precaricare" />
+      <textarea rows={3} value={list} onChange={(e) => setList(e.target.value)} placeholder={tr("rt.warmPh")} spellCheck={false} aria-label={tr("rt.warmAria")} />
       <div className="inline tight">
         <button
           className="secondary small"
@@ -507,24 +506,24 @@ function CachePanel(props: { r: RuleInfo }) {
               const res = await api.warmCache(r.id, files.map(full));
               setWarm(res.results);
               const bad = res.results.filter((x) => x.error || (x.status ?? 500) >= 400).length;
-              setMsg({ ok: bad === 0, text: bad === 0 ? `${res.results.length} file precaricati.` : `${bad} su ${res.results.length} con problemi.` });
+              setMsg({ ok: bad === 0, text: bad === 0 ? tr("rt.warmed", { n: res.results.length }) : tr("rt.warmBad", { bad, n: res.results.length }) });
             })
           }
         >
-          {busy === "warm" ? "Precarico…" : "Precarica"}
+          {busy === "warm" ? tr("rt.warming") : tr("rt.warm")}
         </button>
-        <span className="muted small-text">Il nodo richiede i file uno alla volta: la prima visita sarà già dalla cache.</span>
+        <span className="muted small-text">{tr("rt.warmNote")}</span>
       </div>
       {msg && <div className={`box ${msg.ok ? "good" : "bad"}`}>{msg.text}</div>}
       {warm.length > 0 && (
         <table className="mini">
           <thead>
             <tr>
-              <th>File</th>
-              <th>Stato</th>
-              <th>Cache</th>
-              <th>Byte</th>
-              <th>Tempo</th>
+              <th>{tr("rt.thFile")}</th>
+              <th>{tr("rt.thStatus")}</th>
+              <th>{tr("rt.thCache")}</th>
+              <th>{tr("rt.thBytes")}</th>
+              <th>{tr("rt.thTime")}</th>
             </tr>
           </thead>
           <tbody>
@@ -574,22 +573,22 @@ function ProbePanel(props: { r: RuleInfo; port: number; onDiagnose: (url: string
         <input
           value={file}
           onChange={(e) => setFile(e.target.value)}
-          placeholder="file da provare, es. barca.jpg"
-          aria-label="File da provare"
+          placeholder={tr("rt.probePh")}
+          aria-label={tr("rt.probeAria")}
           spellCheck={false}
           onKeyDown={(e) => e.key === "Enter" && file.trim() && void probe()}
         />
         <button className="secondary small" onClick={probe} disabled={busy || !file.trim()}>
-          {busy ? "…" : "Prova"}
+          {busy ? "…" : tr("rt.probe")}
         </button>
         {file.trim() && (
-          <button className="ghost small" onClick={() => props.onDiagnose(url)} title="Segue il percorso della richiesta e mostra dove si ferma">
-            Diagnosi
+          <button className="ghost small" onClick={() => props.onDiagnose(url)} title={tr("rt.diagnoseTip")}>
+            {tr("rt.diagnose")}
           </button>
         )}
         {file.trim() && (
           <a className="ghost small btn" href={url} target="_blank" rel="noreferrer">
-            Apri
+            {tr("rt.open")}
           </a>
         )}
       </div>
@@ -599,10 +598,10 @@ function ProbePanel(props: { r: RuleInfo; port: number; onDiagnose: (url: string
           <thead>
             <tr>
               <th>#</th>
-              <th>Stato</th>
-              <th>Cache</th>
-              <th>Tipo</th>
-              <th>Tempo</th>
+              <th>{tr("rt.thStatus")}</th>
+              <th>{tr("rt.thCache")}</th>
+              <th>{tr("rt.thType")}</th>
+              <th>{tr("rt.thTime")}</th>
             </tr>
           </thead>
           <tbody>

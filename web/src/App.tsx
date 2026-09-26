@@ -4,9 +4,11 @@ import { AuthScreen } from "./AuthScreen";
 import { Dashboard } from "./Dashboard";
 import { ForcedPassword, ForcedTwoFactor } from "./Forced";
 import { AuthProvider } from "./auth";
+import { useT } from "./i18n";
 import { setDocsBase } from "./ui";
 
 export function App() {
+  const t = useT();
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,10 +29,10 @@ export function App() {
     return (
       <div className="shell">
         <div className="card">
-          <h1>Gateway non raggiungibile</h1>
+          <h1>{t("app.unreachable")}</h1>
           <p className="lead">{error}</p>
           <button className="primary" onClick={load}>
-            Riprova
+            {t("common.retry")}
           </button>
         </div>
       </div>

@@ -1,13 +1,13 @@
 import { useState, type ReactNode } from "react";
 import type { MetricsRange, MetricsResponse } from "./api";
-import { loc } from "./i18n";
+import { loc, tr } from "./i18n";
 import { fmtBytes } from "./ui";
 
 export const fmtNum = (n: number) => new Intl.NumberFormat(loc()).format(n);
 export const fmtPct = (v: number | null) => (v === null ? "—" : `${(v * 100).toLocaleString(loc(), { maximumFractionDigits: 1 })}%`);
 /** Le latenze arrivano come limite superiore della fascia; oltre l'ultima fascia il valore è "enorme". */
 export const fmtMs = (v: number | null) =>
-  v === null ? "—" : v > 1e9 ? "> 2,5 s" : v >= 1000 ? `${(v / 1000).toLocaleString(loc())} s` : `≤ ${v} ms`;
+  v === null ? "—" : v > 1e9 ? `> ${(2.5).toLocaleString(loc())} s` : v >= 1000 ? `${(v / 1000).toLocaleString(loc())} s` : `≤ ${v} ms`;
 
 /** Estremo "tondo" per l'asse verticale. */
 function niceMax(v: number): number {
@@ -49,7 +49,7 @@ export function RequestsChart(props: { series: MetricsResponse["series"]; range:
 
   return (
     <div className="chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Richieste nel tempo" onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr("chart.aria")} onMouseLeave={() => setHover(null)}>
         {[0, 0.25, 0.5, 0.75, 1].map((f) => (
           <g key={f}>
             <line x1={pad.l} x2={W - pad.r} y1={y(max * f)} y2={y(max * f)} className="grid" />
@@ -84,28 +84,28 @@ export function RequestsChart(props: { series: MetricsResponse["series"]; range:
         <div className="chart-tip" style={{ left: `${((pad.l + (hover + 0.5) * bw) / W) * 100}%` }}>
           <strong>{tipLabel(p.t, range)}</strong>
           <span>
-            <i className="sw hit" /> Dalla cache <b>{fmtNum(p.hit)}</b>
+            <i className="sw hit" /> {tr("chart.hit")} <b>{fmtNum(p.hit)}</b>
           </span>
           <span>
-            <i className="sw miss" /> Dallo storage <b>{fmtNum(p.miss)}</b>
+            <i className="sw miss" /> {tr("chart.miss")} <b>{fmtNum(p.miss)}</b>
           </span>
           <span>
-            <i className="sw other" /> Altro <b>{fmtNum(p.other)}</b>
+            <i className="sw other" /> {tr("chart.other")} <b>{fmtNum(p.other)}</b>
           </span>
           <span className="muted">
-            Banda {fmtBytes(p.bytes)} · errori {fmtNum(p.err)}
+            {tr("chart.bandwidth", { bytes: fmtBytes(p.bytes), err: fmtNum(p.err) })}
           </span>
         </div>
       )}
       <div className="legend">
         <span>
-          <i className="sw hit" /> Dalla cache (HIT)
+          <i className="sw hit" /> {tr("chart.legendHit")}
         </span>
         <span>
-          <i className="sw miss" /> Dallo storage (MISS)
+          <i className="sw miss" /> {tr("chart.legendMiss")}
         </span>
         <span>
-          <i className="sw other" /> Altro (BYPASS, STALE, 404…)
+          <i className="sw other" /> {tr("chart.legendOther")}
         </span>
       </div>
     </div>
@@ -134,7 +134,7 @@ export function HBars(props: { items: { label: string; value: number; tone: "goo
 export function Histogram(props: { bins: { label: string; count: number }[] }) {
   const max = Math.max(1, ...props.bins.map((b) => b.count));
   return (
-    <div className="histo" role="img" aria-label="Distribuzione della latenza">
+    <div className="histo" role="img" aria-label={tr("chart.histoAria")}>
       {props.bins.map((b) => (
         <div key={b.label} className="hi-col" title={`${b.label}: ${fmtNum(b.count)}`}>
           <span className="hi-bar" style={{ height: `${Math.max(b.count ? 4 : 0, (b.count / max) * 100)}%` }} />

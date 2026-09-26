@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, type BucketInfo, type PanelState, type TestResult } from "../api";
 import { useAuth } from "../auth";
 import { DataTable, type Column } from "../DataTable";
+import { tr } from "../i18n";
 import { DeleteButton, EmptyState, Field, Modal, Page } from "../ui";
 
 interface Form {
@@ -64,11 +65,11 @@ export function Buckets(props: { state: PanelState; refresh: () => Promise<void>
   };
 
   const columns: Column<BucketInfo>[] = [
-    { key: "name", header: "Nome", sort: (x) => x.name, render: (x) => <strong>{x.name}</strong> },
+    { key: "name", header: tr("bk2.colName"), sort: (x) => x.name, render: (x) => <strong>{x.name}</strong> },
     { key: "bucket", header: "Bucket", sort: (x) => x.bucket, render: (x) => <code>{x.bucket}</code> },
     {
       key: "status",
-      header: "Stato",
+      header: tr("bk2.colStatus"),
       sort: (x) => bucketBadge(x).label,
       render: (x) => {
         const s = bucketBadge(x);
@@ -77,7 +78,7 @@ export function Buckets(props: { state: PanelState; refresh: () => Promise<void>
     },
     {
       key: "rules",
-      header: "Instradamenti",
+      header: tr("bk2.colRoutes"),
       sort: (x) => rules.filter((r) => r.bucket_id === x.id).length,
       align: "right",
       render: (x) => rules.filter((r) => r.bucket_id === x.id).length,
@@ -86,17 +87,16 @@ export function Buckets(props: { state: PanelState; refresh: () => Promise<void>
 
   return (
     <Page
-      title="Bucket"
-     
-      lead="Censisci gli storage S3 da cui leggere i file. Le chiavi restano su questo nodo e non vengono mai mostrate. Gli instradamenti si creano dopo, scegliendo tra i bucket censiti."
+      title={tr("nav.buckets")}
+      lead={tr("bk2.lead")}
     >
       {err && <div className="box bad">{err}</div>}
       <div className="card">
         <div className="head">
-          <h2>Bucket censiti</h2>
+          <h2>{tr("bk2.registered")}</h2>
           {canWrite && buckets.length > 0 && (
             <button className="primary small" onClick={() => setAdding(true)}>
-              Nuovo bucket
+              {tr("bk2.new")}
             </button>
           )}
         </div>
@@ -107,19 +107,19 @@ export function Buckets(props: { state: PanelState; refresh: () => Promise<void>
           empty={
             <EmptyState
               image="bucket"
-              title="Nessun bucket collegato"
-              text="Collega uno storage S3: le chiavi restano su questo nodo e non vengono mai mostrate."
-              action={canWrite ? { label: "Nuovo bucket", onClick: () => setAdding(true) } : undefined}
+              title={tr("bk2.none")}
+              text={tr("bk2.noneText")}
+              action={canWrite ? { label: tr("bk2.new"), onClick: () => setAdding(true) } : undefined}
             />
           }
           searchText={(x) => `${x.name} ${x.bucket} ${x.endpoint}`}
-          searchPlaceholder="Cerca bucket…"
+          searchPlaceholder={tr("bk2.search")}
           initialSort={{ key: "name", dir: "asc" }}
           defaultExpanded={(x) => !!x.check && x.check.outcome !== "found"}
           actions={!canWrite ? undefined : (x) => (
             <>
               <button className="secondary small" onClick={() => run(`check:${x.id}`, () => api.checkBucket(x.id))} disabled={busy === `check:${x.id}`}>
-                {busy === `check:${x.id}` ? "Controllo…" : "Ricontrolla"}
+                {busy === `check:${x.id}` ? tr("bk2.checking") : tr("bk2.recheck")}
               </button>
               <DeleteButton onConfirm={() => run(`del:${x.id}`, () => api.deleteBucket(x.id))} />
             </>
@@ -131,11 +131,11 @@ export function Buckets(props: { state: PanelState; refresh: () => Promise<void>
                 <dd>
                   <code>{x.endpoint}</code>
                 </dd>
-                <dt>Regione</dt>
+                <dt>{tr("bk2.region")}</dt>
                 <dd>{x.region}</dd>
-                <dt>Indirizzamento</dt>
-                <dd>{x.addressing === "path" ? "Path (endpoint/bucket/file)" : "Virtual host (bucket.endpoint/file)"}</dd>
-                <dt>File di prova</dt>
+                <dt>{tr("bk2.addressing")}</dt>
+                <dd>{x.addressing === "path" ? tr("bk2.pathFull") : tr("bk2.virtualFull")}</dd>
+                <dt>{tr("bk2.testFile")}</dt>
                 <dd>
                   <code>{x.test_file || "—"}</code>
                 </dd>
@@ -161,9 +161,9 @@ export function Buckets(props: { state: PanelState; refresh: () => Promise<void>
 
 function bucketBadge(b: BucketInfo) {
   const c = b.check;
-  if (!c) return { cls: "badge", label: "Non verificato" };
-  if (c.outcome === "found") return { cls: "badge good", label: "Raggiungibile" };
-  return c.ok ? { cls: "badge warn", label: "File non trovato" } : { cls: "badge bad", label: "Errore" };
+  if (!c) return { cls: "badge", label: tr("bk2.unverified") };
+  if (c.outcome === "found") return { cls: "badge good", label: tr("bk2.reachable") };
+  return c.ok ? { cls: "badge warn", label: tr("bk2.notFound") } : { cls: "badge bad", label: tr("bk2.error") };
 }
 
 export function BucketForm(props: { onCancel?: () => void; cancelLabel?: string; onSaved: () => Promise<void> }) {
@@ -212,10 +212,10 @@ export function BucketForm(props: { onCancel?: () => void; cancelLabel?: string;
 
   return (
     <>
-      <Field label="Nome" hint="Per riconoscerlo, ad esempio “Catalogo prodotti”.">
-        <input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Catalogo prodotti" autoFocus />
+      <Field label={tr("bk2.colName")} hint={tr("bk2.nameHint")}>
+        <input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder={tr("bk2.namePh")} autoFocus />
       </Field>
-      <Field label="Endpoint" hint="Solo indirizzo, senza bucket né percorso.">
+      <Field label={tr("bk2.endpoint")} hint={tr("bk2.endpointHint")}>
         <input
           value={f.endpoint}
           onChange={(e) => {
@@ -228,13 +228,13 @@ export function BucketForm(props: { onCancel?: () => void; cancelLabel?: string;
         />
       </Field>
       <div className="row">
-        <Field label="Regione">
+        <Field label={tr("bk2.region")}>
           <input value={f.region} onChange={(e) => set("region", e.target.value)} spellCheck={false} />
         </Field>
-        <Field label="Indirizzamento" hint={f.addressing === "path" ? "endpoint/bucket/file" : "bucket.endpoint/file"}>
+        <Field label={tr("bk2.addressing")} hint={f.addressing === "path" ? "endpoint/bucket/file" : "bucket.endpoint/file"}>
           <select value={f.addressing} onChange={(e) => set("addressing", e.target.value as Form["addressing"])}>
-            <option value="path">Path (MinIO, Garage…)</option>
-            <option value="virtual">Virtual host (AWS, Wasabi…)</option>
+            <option value="path">{tr("bk2.pathOpt")}</option>
+            <option value="virtual">{tr("bk2.virtualOpt")}</option>
           </select>
         </Field>
       </div>
@@ -249,28 +249,28 @@ export function BucketForm(props: { onCancel?: () => void; cancelLabel?: string;
       {looksPrivate(f.endpoint) && (
         <label className="check">
           <input type="checkbox" checked={f.allow_private_endpoint} onChange={(e) => set("allow_private_endpoint", e.target.checked)} />
-          <span>Lo storage è in rete locale o su questa macchina. Consenti l’accesso a un indirizzo interno.</span>
+          <span>{tr("bk2.private")}</span>
         </label>
       )}
       <div className="row">
-        <Field label="Bucket">
-          <input value={f.bucket} onChange={(e) => set("bucket", e.target.value)} placeholder="catalogo" spellCheck={false} />
+        <Field label={tr("nav.buckets")}>
+          <input value={f.bucket} onChange={(e) => set("bucket", e.target.value)} placeholder={tr("bk2.bucketPh")} spellCheck={false} />
         </Field>
-        <Field label="File di prova" hint="Percorso di un file esistente nel bucket: serve a verificare la lettura, ora e nei controlli futuri.">
+        <Field label={tr("bk2.testFile")} hint={tr("bk2.testHint")}>
           <input value={f.file} onChange={(e) => set("file", e.target.value)} placeholder="foto/barca.jpg" spellCheck={false} />
         </Field>
       </div>
 
       <button className="secondary" onClick={runTest} disabled={!canTest || busy !== null}>
-        {busy === "test" ? "Verifico…" : "Verifica connessione"}
+        {busy === "test" ? tr("bk2.verifying") : tr("bk2.verify")}
       </button>
       {fresh && (
         <div className={`box ${fresh.outcome === "found" ? "good" : fresh.ok ? "warn" : "bad"}`} role="status">
           {fresh.message}
           {fresh.outcome === "found" && (
             <div className="muted">
-              {fresh.content_type || "tipo sconosciuto"}
-              {fresh.size ? ` · ${fresh.size} byte` : ""}
+              {fresh.content_type || tr("bk2.unknownType")}
+              {fresh.size ? ` · ${tr("bk2.bytes", { n: fresh.size })}` : ""}
             </div>
           )}
         </div>
@@ -279,13 +279,13 @@ export function BucketForm(props: { onCancel?: () => void; cancelLabel?: string;
       <div className="nav">
         {props.onCancel ? (
           <button className="ghost" onClick={props.onCancel}>
-            {props.cancelLabel ?? "Annulla"}
+            {props.cancelLabel ?? tr("common.cancel")}
           </button>
         ) : (
           <span />
         )}
         <button className="primary" onClick={save} disabled={!fresh || !fresh.ok || !f.name.trim() || busy !== null}>
-          {busy === "save" ? "Salvo…" : fresh?.outcome === "not_found" ? "Censisci comunque" : "Censisci bucket"}
+          {busy === "save" ? tr("common.saving") : fresh?.outcome === "not_found" ? tr("bk2.saveAnyway") : tr("bk2.register")}
         </button>
       </div>
     </>
@@ -294,7 +294,7 @@ export function BucketForm(props: { onCancel?: () => void; cancelLabel?: string;
 
 function NewBucket(props: { onClose: () => void; onSaved: () => Promise<void> }) {
   return (
-    <Modal title="Nuovo bucket" onClose={props.onClose}>
+    <Modal title={tr("bk2.new")} onClose={props.onClose}>
       <BucketForm onCancel={props.onClose} onSaved={props.onSaved} />
     </Modal>
   );

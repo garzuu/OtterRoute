@@ -1,4 +1,5 @@
 import type { PanelState } from "./api";
+import { tr } from "./i18n";
 
 export interface SetupStep {
   id: "domain" | "bucket" | "route";
@@ -14,20 +15,20 @@ export function setupSteps(s: PanelState): SetupStep[] {
     {
       id: "domain",
       done: domains.some((d) => d.verified),
-      title: "Aggiungi un dominio verificato",
-      text: "Il sistema controlla che i record DNS puntino a questo nodo e che sia raggiungibile.",
+      title: tr("setup.domain.title"),
+      text: tr("setup.domain.text"),
     },
     {
       id: "bucket",
       done: buckets.length > 0,
-      title: "Collega un bucket",
-      text: "Endpoint e credenziali dello storage S3.",
+      title: tr("setup.bucket.title"),
+      text: tr("setup.bucket.text"),
     },
     {
       id: "route",
       done: rules.length > 0,
-      title: "Crea un instradamento",
-      text: "Dominio e prefisso verso un bucket e una cartella.",
+      title: tr("setup.route.title"),
+      text: tr("setup.route.text"),
     },
   ];
 }

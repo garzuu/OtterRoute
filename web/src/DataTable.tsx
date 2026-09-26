@@ -1,3 +1,4 @@
+import { loc, tr } from "./i18n";
 import { useMemo, useState, type ReactNode } from "react";
 import { IconChevron, IconSortAsc, IconSortDesc, IconSortNone } from "./icons";
 import { EmptyState } from "./ui";
@@ -29,7 +30,7 @@ interface Props<T> {
 }
 
 const cmp = (a: string | number, b: string | number) =>
-  typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), "it", { numeric: true });
+  typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), loc(), { numeric: true });
 
 /** Tabella dati: colonne definite, ordinamento, ricerca, azioni e righe espandibili. */
 export function DataTable<T>(props: Props<T>) {
@@ -63,12 +64,12 @@ export function DataTable<T>(props: Props<T>) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={props.searchPlaceholder ?? "Cerca…"}
-            aria-label="Cerca"
+            placeholder={props.searchPlaceholder ?? tr("dt.search")}
+            aria-label={tr("dt.searchAria")}
           />
           {query && (
             <span className="muted small-text">
-              {visible.length} di {rows.length}
+              {tr("dt.count", { shown: visible.length, total: rows.length })}
             </span>
           )}
         </div>
@@ -109,7 +110,7 @@ export function DataTable<T>(props: Props<T>) {
                   {rows.length === 0 ? (
                     props.empty
                   ) : (
-                    <EmptyState image="sleeping" title="Nessun risultato" text={`Niente corrisponde a “${query}”.`} />
+                    <EmptyState image="sleeping" title={tr("dt.noResults")} text={tr("dt.noMatch", { q: query })} />
                   )}
                 </td>
               </tr>
@@ -124,7 +125,7 @@ export function DataTable<T>(props: Props<T>) {
                         <button
                           className="dt-toggle"
                           aria-expanded={open}
-                          aria-label={open ? "Nascondi dettagli" : "Mostra dettagli"}
+                          aria-label={open ? tr("dt.hide") : tr("dt.show")}
                           onClick={() => setOverrides((o) => ({ ...o, [rowKey(r)]: !open }))}
                         >
                           <IconChevron />

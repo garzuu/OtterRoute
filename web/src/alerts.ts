@@ -1,5 +1,6 @@
 import { domainStatus, type PanelState } from "./api";
 import type { PageId } from "./Dashboard";
+import { tr } from "./i18n";
 import { canSetup, setupDone, setupSteps } from "./setup";
 
 export interface Alert {
@@ -21,8 +22,8 @@ export function buildAlerts(s: PanelState, can: (scope: string) => boolean): Ale
     out.push({
       id: "setup",
       level: "info",
-      title: `Completa la configurazione · ${setupDone(steps)} di ${steps.length}`,
-      text: `Prossimo passo: ${next.title}. ${next.text}`,
+      title: tr("al.setup.title", { done: setupDone(steps), total: steps.length }),
+      text: tr("al.setup.text", { title: next.title, text: next.text }),
       page: "overview",
       action: "wizard",
     });
@@ -30,16 +31,16 @@ export function buildAlerts(s: PanelState, can: (scope: string) => boolean): Ale
     out.push({
       id: "hand-managed",
       level: "warn",
-      title: "Configurazione gestita a mano",
-      text: "Il nodo usa un config.yaml scritto a mano: il pannello non lo modifica.",
+      title: tr("al.hand.title"),
+      text: tr("al.hand.text"),
       page: "overview",
     });
   for (const ch of s.notify_failing ?? [])
     out.push({
       id: `n:${ch}`,
       level: "warn",
-      title: `Notifiche ${ch === "email" ? "email" : "Telegram"} non recapitate`,
-      text: "L’ultimo invio è fallito: controlla le impostazioni e premi «Invia prova».",
+      title: tr("al.notify.title", { ch: ch === "email" ? "email" : "Telegram" }),
+      text: tr("al.notify.text"),
       page: "notifications",
     });
   const u = s.update;
@@ -47,24 +48,24 @@ export function buildAlerts(s: PanelState, can: (scope: string) => boolean): Ale
     out.push({
       id: `u:${u.latest.version}`,
       level: "info",
-      title: `Nuova versione disponibile · ${u.latest.version}`,
-      text: `Stai usando la ${u.current}. Vedi come aggiornare in Impostazioni → Aggiornamenti.`,
+      title: tr("al.update.title", { v: u.latest.version }),
+      text: tr("al.update.text", { cur: u.current }),
       page: "settings",
     });
   if (u?.updated_from)
     out.push({
       id: `u:done:${u.current}`,
       level: "info",
-      title: `Aggiornato alla versione ${u.current}`,
-      text: `Prima era la ${u.updated_from}. Le novità sono nelle note della release.`,
+      title: tr("al.updated.title", { v: u.current }),
+      text: tr("al.updated.text", { from: u.updated_from }),
       page: "settings",
     });
   if (u?.rollback)
     out.push({
       id: `u:rollback:${u.rollback.to}`,
       level: "warn",
-      title: `L’aggiornamento alla ${u.rollback.to} non è riuscito`,
-      text: `Il nodo è tornato alla versione precedente. ${u.rollback.reason}`,
+      title: tr("al.rollback.title", { v: u.rollback.to }),
+      text: tr("al.rollback.text", { reason: u.rollback.reason }),
       page: "settings",
     });
   const now = Date.now() / 1000;
@@ -74,24 +75,24 @@ export function buildAlerts(s: PanelState, can: (scope: string) => boolean): Ale
         out.push({
           id: `c:${c.host}`,
           level: c.status === "expired" ? "error" : "warn",
-          title: `${c.status === "expired" ? "Certificato scaduto" : "Certificato in scadenza"} · ${c.host}`,
-          text: c.status === "expired" ? "Il certificato HTTPS è scaduto e il rinnovo non è riuscito." : "Scade tra meno di 14 giorni: il rinnovo automatico non è ancora riuscito.",
+          title: tr(c.status === "expired" ? "al.cert.expired" : "al.cert.expiring", { host: c.host }),
+          text: tr(c.status === "expired" ? "al.cert.expiredText" : "al.cert.expiringText"),
           page: "domains",
         });
       else if (c.status === "error")
-        out.push({ id: `c:${c.host}`, level: "warn", title: `Certificato non emesso · ${c.host}`, text: c.error?.message ?? "", page: "domains" });
+        out.push({ id: `c:${c.host}`, level: "warn", title: tr("al.cert.error", { host: c.host }), text: c.error?.message ?? "", page: "domains" });
     }
   for (const d of can("domains:read") ? s.panel.domains : []) {
     const st = domainStatus(d);
     if (st === "verified") continue;
     // cosa non va: il DNS non risolve, oppure il dominio risolve ma il nodo non risponde
     const failing = d.stages.find((x) => x.status === "fail")?.id;
-    const title = failing === "reach" ? "Il nodo non risponde attraverso il dominio" : "Il dominio non risolve";
+    const title = tr(failing === "reach" ? "al.dom.reach" : "al.dom.dns", { host: d.host });
     out.push({
       id: `d:${d.host}`,
       // era valido e ora non lo è più: errore; mai verificato: attesa della propagazione
       level: st === "pending" ? "warn" : "error",
-      title: `${title} · ${d.host}`,
+      title,
       text: d.message,
       page: "domains",
     });
@@ -99,15 +100,15 @@ export function buildAlerts(s: PanelState, can: (scope: string) => boolean): Ale
   for (const b of can("buckets:read") ? s.panel.buckets : []) {
     const c = b.check;
     if (!c) {
-      out.push({ id: `b:${b.id}`, level: "warn", title: `Bucket non verificato · ${b.name}`, text: "Non è ancora stata provata la lettura.", page: "buckets" });
+      out.push({ id: `b:${b.id}`, level: "warn", title: tr("al.bkt.unverified", { name: b.name }), text: tr("al.bkt.unverifiedText"), page: "buckets" });
     } else if (c.outcome === "unreachable") {
-      out.push({ id: `b:${b.id}`, level: "error", title: `Bucket non raggiungibile · ${b.name}`, text: c.message, page: "buckets" });
+      out.push({ id: `b:${b.id}`, level: "error", title: tr("al.bkt.unreachable", { name: b.name }), text: c.message, page: "buckets" });
     } else if (c.outcome === "auth") {
-      out.push({ id: `b:${b.id}`, level: "error", title: `Credenziali rifiutate · ${b.name}`, text: c.message, page: "buckets" });
+      out.push({ id: `b:${b.id}`, level: "error", title: tr("al.bkt.auth", { name: b.name }), text: c.message, page: "buckets" });
     } else if (!c.ok) {
-      out.push({ id: `b:${b.id}`, level: "error", title: `Errore sul bucket · ${b.name}`, text: c.message, page: "buckets" });
+      out.push({ id: `b:${b.id}`, level: "error", title: tr("al.bkt.error", { name: b.name }), text: c.message, page: "buckets" });
     } else if (c.outcome !== "found") {
-      out.push({ id: `b:${b.id}`, level: "warn", title: `File di prova non trovato · ${b.name}`, text: c.message, page: "buckets" });
+      out.push({ id: `b:${b.id}`, level: "warn", title: tr("al.bkt.notfound", { name: b.name }), text: c.message, page: "buckets" });
     }
   }
   const rank = { error: 0, info: 1, warn: 2 } as const;

@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { api } from "./api";
+import { useT } from "./i18n";
 import { TwoFactorSetup } from "./TwoFactor";
 
 function Shell(props: { title: string; lead: string; onLogout: () => void; children: React.ReactNode }) {
+  const t = useT();
   return (
     <div className="shell">
       <div className="card">
@@ -11,7 +13,7 @@ function Shell(props: { title: string; lead: string; onLogout: () => void; child
         {props.children}
         <div className="mt">
           <button className="link" onClick={props.onLogout}>
-            Esci
+            {t("menu.logout")}
           </button>
         </div>
       </div>
@@ -21,6 +23,7 @@ function Shell(props: { title: string; lead: string; onLogout: () => void; child
 
 /** Password temporanea: va sostituita prima di entrare. */
 export function ForcedPassword(props: { onDone: () => void; onLogout: () => void }) {
+  const t = useT();
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
@@ -43,30 +46,30 @@ export function ForcedPassword(props: { onDone: () => void; onLogout: () => void
 
   return (
     <Shell
-      title="Scegli una nuova password"
-      lead="Stai usando una password temporanea. Sceglierne una tua è necessario per continuare."
+      title={t("forced.pw.title")}
+      lead={t("forced.pw.lead")}
       onLogout={props.onLogout}
     >
       <form onSubmit={submit}>
         <label className="field">
-          <span className="flabel">Password attuale (temporanea)</span>
+          <span className="flabel">{t("forced.pw.current")}</span>
           <input type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" autoFocus />
         </label>
         <label className="field">
-          <span className="flabel">Nuova password</span>
+          <span className="flabel">{t("pw.new")}</span>
           <input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" />
-          <span className="hint">Almeno 10 caratteri.</span>
+          <span className="hint">{t("pw.min")}</span>
         </label>
         <label className="field">
-          <span className="flabel">Ripeti la nuova password</span>
+          <span className="flabel">{t("pw.again")}</span>
           <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" />
-          {again && next !== again && <span className="hint bad-text">Le password non coincidono.</span>}
+          {again && next !== again && <span className="hint bad-text">{t("forced.pw.mismatch")}</span>}
         </label>
         {err && <div className="box bad">{err}</div>}
         <div className="nav">
           <span />
           <button className="primary" disabled={!valid || busy}>
-            {busy ? "Attendi…" : "Cambia password"}
+            {busy ? t("common.wait") : t("pw.change")}
           </button>
         </div>
       </form>
@@ -76,10 +79,11 @@ export function ForcedPassword(props: { onDone: () => void; onLogout: () => void
 
 /** Il criterio di sicurezza richiede la 2FA: va attivata prima di entrare. */
 export function ForcedTwoFactor(props: { onDone: () => void; onLogout: () => void }) {
+  const t = useT();
   return (
     <Shell
-      title="Attiva la verifica in due passaggi"
-      lead="Il criterio di sicurezza di questo nodo richiede un secondo fattore per il tuo account."
+      title={t("forced.tfa.title")}
+      lead={t("forced.tfa.lead")}
       onLogout={props.onLogout}
     >
       <TwoFactorSetup onDone={props.onDone} />

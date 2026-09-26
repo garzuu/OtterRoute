@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type DiagResult, type DiagStep } from "../api";
 import { takeDiagnosisTarget } from "../diagnosisTarget";
+import { useT, type Key } from "../i18n";
 import { Page } from "../ui";
 
-const MARK: Record<DiagStep["status"], { icon: string; cls: string; text: string }> = {
-  ok: { icon: "✓", cls: "good", text: "Ok" },
-  warn: { icon: "!", cls: "warn", text: "Attenzione" },
-  fail: { icon: "✕", cls: "bad", text: "Problema" },
-  skip: { icon: "–", cls: "", text: "Saltato" },
+const MARK: Record<DiagStep["status"], { icon: string; cls: string }> = {
+  ok: { icon: "✓", cls: "good" },
+  warn: { icon: "!", cls: "warn" },
+  fail: { icon: "✕", cls: "bad" },
+  skip: { icon: "–", cls: "" },
 };
 
 export function Diagnosis() {
+  const t = useT();
   const [url, setUrl] = useState("");
   const [res, setRes] = useState<DiagResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,7 +50,7 @@ export function Diagnosis() {
       await navigator.clipboard.writeText(res.report);
       setCopied(true);
     } catch {
-      setErr("Copia non riuscita: seleziona il testo del report a mano.");
+      setErr(t("diag.copyFail"));
     }
   };
 
@@ -57,8 +59,8 @@ export function Diagnosis() {
 
   return (
     <Page
-      title="Diagnosi"
-      lead="Scrivi l’indirizzo di un file che non funziona: il nodo segue il percorso della richiesta (DNS, nodo, instradamento, cache, storage) e ti dice dove si ferma e cosa fare."
+      title={t("diag.title")}
+      lead={t("diag.lead")}
     >
       <div className="card">
         <div className="inline tight">
@@ -66,15 +68,15 @@ export function Diagnosis() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://cdn.example.com/foto/barca.jpg"
-            aria-label="Indirizzo da diagnosticare"
+            aria-label={t("diag.aria")}
             spellCheck={false}
             onKeyDown={(e) => e.key === "Enter" && url.trim() && !busy && void run(url.trim())}
           />
           <button className="primary" onClick={() => run(url.trim())} disabled={busy || !url.trim()}>
-            {busy ? "Controllo…" : "Diagnostica"}
+            {busy ? t("diag.checking") : t("diag.run")}
           </button>
         </div>
-        <p className="muted small-text">La prova fa una richiesta reale al nodo: se il file esiste finisce anche in cache, come una visita vera.</p>
+        <p className="muted small-text">{t("diag.note")}</p>
       </div>
 
       {err && <div className="box bad">{err}</div>}
@@ -87,7 +89,7 @@ export function Diagnosis() {
               const m = MARK[s.status];
               return (
                 <li key={s.id} className={`diag-step ${m.cls}`}>
-                  <span className={`diag-mark ${m.cls}`} aria-label={m.text}>
+                  <span className={`diag-mark ${m.cls}`} aria-label={t(`diag.${s.status}` as Key)}>
                     {m.icon}
                   </span>
                   <div>
@@ -95,7 +97,7 @@ export function Diagnosis() {
                     <div className="muted">{s.detail}</div>
                     {s.fix && (
                       <div className="diag-fix">
-                        <strong>Cosa fare:</strong> {s.fix}
+                        <strong>{t("diag.todo")}</strong> {s.fix}
                       </div>
                     )}
                   </div>
@@ -104,9 +106,9 @@ export function Diagnosis() {
             })}
           </ol>
           <div className="nav">
-            <span className="muted small-text">Il report non contiene chiavi né segreti.</span>
+            <span className="muted small-text">{t("diag.noSecrets")}</span>
             <button className="secondary" onClick={copy}>
-              {copied ? "Copiato ✓" : "Copia report"}
+              {copied ? t("diag.copied") : t("diag.copy")}
             </button>
           </div>
         </div>

@@ -2,13 +2,10 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { api } from "./api";
 import { CodeField } from "./TwoFactor";
 import { IconCheck, IconEye, IconEyeOff, IconLock, IconUser } from "./icons";
+import { LangToggle, tr, useT, type Key } from "./i18n";
 import { Illus } from "./ui";
 
-const POINTS = [
-  "Più domini e più bucket S3, un solo nodo",
-  "Cache su disco con svuotamento immediato",
-  "Controlli automatici di DNS e storage",
-];
+const POINTS: Key[] = ["auth.point1", "auth.point2", "auth.point3"];
 
 /** Robustezza indicativa: lunghezza e varietà di caratteri. */
 function strength(pw: string): { score: number; label: string } {
@@ -17,7 +14,7 @@ function strength(pw: string): { score: number; label: string } {
   if (pw.length >= 14) score++;
   if (/[a-z]/.test(pw) && /[A-Z]/.test(pw) && /\d/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
-  return { score, label: ["Troppo corta", "Debole", "Discreta", "Buona", "Ottima"][score] };
+  return { score, label: tr(`auth.str${score}` as Key) };
 }
 
 function Input(props: {
@@ -54,7 +51,7 @@ function Input(props: {
             type="button"
             className="aeye"
             onClick={() => setShown(!shown)}
-            aria-label={shown ? "Nascondi la password" : "Mostra la password"}
+            aria-label={shown ? tr("auth.hidePw") : tr("auth.showPw")}
             tabIndex={-1}
           >
             {shown ? <IconEyeOff /> : <IconEye />}
@@ -66,6 +63,7 @@ function Input(props: {
 }
 
 export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void }) {
+  const t = useT();
   const setup = props.mode === "setup";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -124,13 +122,11 @@ export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void 
         <img className="logo-img" src="/logo-tile.png" alt="" width={44} height={44} />
         <span>OtterRoute</span>
       </div>
-      <h1>Verifica in due passaggi</h1>
+      <h1>{t("auth.2fa.title")}</h1>
       <p className="lead">
         {useRecovery
-          ? "Inserisci uno dei codici di recupero che hai salvato. Ognuno vale una volta sola."
-          : "Apri l’app di autenticazione e inserisci il codice a 6 cifre per "}
-        {!useRecovery && <strong>{username}</strong>}
-        {!useRecovery && "."}
+          ? t("auth.2fa.recoveryLead")
+          : t("auth.2fa.appLead", { user: username })}
       </p>
       {useRecovery ? (
         <input
@@ -140,14 +136,14 @@ export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void 
           placeholder="xxxxx-xxxxx"
           autoFocus
           spellCheck={false}
-          aria-label="Codice di recupero"
+          aria-label={t("auth.2fa.recoveryAria")}
         />
       ) : (
         <CodeField value={code} onChange={setCode} autoFocus />
       )}
       {err && <div className="box bad">{err}</div>}
       <button className="primary abtn" disabled={busy || code.replace(/\s/g, "").length < 6}>
-        {busy ? "Attendi…" : "Verifica"}
+        {busy ? t("common.wait") : t("auth.2fa.verify")}
       </button>
       <div className="auth-alt">
         <button
@@ -159,7 +155,7 @@ export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void 
             setErr(null);
           }}
         >
-          {useRecovery ? "Usa il codice dell’app" : "Usa un codice di recupero"}
+          {useRecovery ? t("auth.2fa.useApp") : t("auth.2fa.useRecovery")}
         </button>
         <button
           type="button"
@@ -171,7 +167,7 @@ export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void 
             setPassword("");
           }}
         >
-          Indietro
+          {t("auth.back")}
         </button>
       </div>
     </form>
@@ -191,26 +187,31 @@ export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void 
             <span className="ring r2" aria-hidden />
             <Illus name={setup ? "welcome" : "laptop"} width={setup ? 230 : 280} />
           </div>
-          <h2>Pubblica i tuoi file,
+          <h2>
+            {t("auth.hero1")}
             <br />
-            ovunque.</h2>
-          <p>Un gateway self-hosted per i tuoi bucket S3: più domini, cache su disco e nessuna configurazione di proxy.</p>
+            {t("auth.hero2")}
+          </h2>
+          <p>{t("auth.heroText")}</p>
           <ul>
-            {POINTS.map((t) => (
-              <li key={t}>
+            {POINTS.map((k) => (
+              <li key={k}>
                 <span className="tick" aria-hidden>
                   <IconCheck />
                 </span>
-                {t}
+                {t(k)}
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="auth-brand-foot">Gateway per storage S3 · self-hosted</div>
+        <div className="auth-brand-foot">{t("auth.foot")}</div>
       </aside>
 
       <main className="auth-form-wrap">
+        <div style={{ position: "absolute", top: 16, right: 20 }}>
+          <LangToggle />
+        </div>
         {secondStep || (
         <form className="auth-form" onSubmit={submit}>
           <div className="auth-mobile-brand">
@@ -218,16 +219,14 @@ export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void 
             <span>OtterRoute</span>
           </div>
 
-          <h1>{setup ? "Benvenuto! Crea l’amministratore" : "Bentornato"}</h1>
+          <h1>{setup ? t("auth.setupTitle") : t("auth.loginTitle")}</h1>
           <p className="lead">
-            {setup
-              ? "È il primo avvio di questo nodo. Scegli le credenziali con cui gestirai domini, bucket e instradamenti."
-              : "Accedi al pannello per gestire domini, bucket e instradamenti."}
+            {setup ? t("auth.setupLead") : t("auth.loginLead")}
           </p>
 
-          <Input label="Nome utente" icon={<IconUser />} value={username} onChange={setUsername} autoComplete="username" autoFocus />
+          <Input label={t("auth.username")} icon={<IconUser />} value={username} onChange={setUsername} autoComplete="username" autoFocus />
           <Input
-            label="Password"
+            label={t("common.password")}
             icon={<IconLock />}
             type="password"
             value={password}
@@ -242,12 +241,12 @@ export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void 
                   <span key={i} className={i <= st.score ? `on s${st.score}` : ""} />
                 ))}
               </div>
-              <span className="muted small-text">{password ? st.label : "Almeno 10 caratteri"}</span>
+              <span className="muted small-text">{password ? st.label : t("auth.min10")}</span>
             </div>
           )}
           {setup && (
             <Input
-              label="Ripeti la password"
+              label={t("auth.repeat")}
               icon={<IconLock />}
               type="password"
               value={confirm}
@@ -256,12 +255,12 @@ export function AuthScreen(props: { mode: "setup" | "login"; onDone: () => void 
               onCaps={setCaps}
             />
           )}
-          {mismatch && <p className="ahint bad-text">Le password non coincidono.</p>}
-          {caps && <p className="ahint warn-text">Bloc Maiusc attivo.</p>}
+          {mismatch && <p className="ahint bad-text">{t("forced.pw.mismatch")}</p>}
+          {caps && <p className="ahint warn-text">{t("auth.caps")}</p>}
           {err && <div className="box bad">{err}</div>}
 
           <button className="primary abtn" disabled={!valid || busy}>
-            {busy ? "Attendi…" : setup ? "Crea e continua" : "Accedi"}
+            {busy ? t("common.wait") : setup ? t("auth.create") : t("auth.login")}
           </button>
         </form>
         )}

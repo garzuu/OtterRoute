@@ -3,6 +3,7 @@ import { en } from "./en";
 import { it, type Key } from "./it";
 
 export type Lang = "it" | "en";
+export { it };
 export type { Key };
 type Params = Record<string, string | number>;
 
@@ -34,6 +35,15 @@ function fill(msg: string, p?: Params): string {
 /** Traduzione senza hook, per le funzioni di utilità: `tr("common.never")`. */
 export function tr(key: Key, p?: Params): string {
   return fill(DICTS[current][key] ?? it[key] ?? key, p);
+}
+
+/** Testo con <b>…</b> e <code>…</code> in nodi React, senza HTML grezzo. */
+export function rich(text: string): ReactNode[] {
+  return text.split(/(<b>.*?<\/b>|<code>.*?<\/code>)/g).map((part, i) => {
+    const m = /^<(b|code)>(.*)<\/\1>$/.exec(part);
+    if (!m) return part;
+    return m[1] === "b" ? <strong key={i}>{m[2]}</strong> : <code key={i}>{m[2]}</code>;
+  });
 }
 
 /** Plurali: cerca `<chiave>.one` / `<chiave>.other` secondo la lingua; `{n}` è il numero. */
@@ -92,5 +102,22 @@ export function LangSwitch() {
         ))}
       </span>
     </div>
+  );
+}
+
+/** Scelta della lingua per le schermate senza menu (accesso). */
+export function LangToggle() {
+  const { lang, setLang } = useLang();
+  return (
+    <span className="muted small-text" role="group" aria-label={tr("lang.label")}>
+      {(["it", "en"] as const).map((l, i) => (
+        <span key={l}>
+          {i > 0 && " · "}
+          <button className="link" style={{ fontWeight: l === lang ? 700 : 400 }} aria-pressed={l === lang} onClick={() => l !== lang && setLang(l)}>
+            {l.toUpperCase()}
+          </button>
+        </span>
+      ))}
+    </span>
   );
 }
