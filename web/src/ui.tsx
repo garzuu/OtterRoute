@@ -19,7 +19,7 @@ export function DeleteButton(props: { onConfirm: () => void | Promise<void>; lab
   if (!armed)
     return (
       <button className="ghost small" onClick={() => setArmed(true)}>
-        {props.label ?? "Elimina"}
+        {props.label ?? tr("common.delete")}
       </button>
     );
   return (
@@ -37,10 +37,10 @@ export function DeleteButton(props: { onConfirm: () => void | Promise<void>; lab
           }
         }}
       >
-        Conferma
+        {tr("common.confirm")}
       </button>
       <button className="ghost small" onClick={() => setArmed(false)}>
-        Annulla
+        {tr("common.cancel")}
       </button>
     </span>
   );
@@ -94,7 +94,7 @@ export function Modal(props: { title: string; onClose: () => void; wide?: boolea
       <div className={props.wide ? "modal wide" : "modal"} role="dialog" aria-modal="true" aria-label={props.title}>
         <div className="mhead">
           <h2>{props.title}</h2>
-          <button className="ghost small" onClick={onClose} aria-label="Chiudi">
+          <button className="ghost small" onClick={onClose} aria-label={tr("common.close")}>
             <IconX />
           </button>
         </div>

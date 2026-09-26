@@ -3,6 +3,7 @@ import { en } from "./en";
 import { it, type Key } from "./it";
 
 export type Lang = "it" | "en";
+export { it };
 export type { Key };
 type Params = Record<string, string | number>;
 
@@ -92,5 +93,22 @@ export function LangSwitch() {
         ))}
       </span>
     </div>
+  );
+}
+
+/** Scelta della lingua per le schermate senza menu (accesso). */
+export function LangToggle() {
+  const { lang, setLang } = useLang();
+  return (
+    <span className="muted small-text" role="group" aria-label={tr("lang.label")}>
+      {(["it", "en"] as const).map((l, i) => (
+        <span key={l}>
+          {i > 0 && " · "}
+          <button className="link" style={{ fontWeight: l === lang ? 700 : 400 }} aria-pressed={l === lang} onClick={() => l !== lang && setLang(l)}>
+            {l.toUpperCase()}
+          </button>
+        </span>
+      ))}
+    </span>
   );
 }

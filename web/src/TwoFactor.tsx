@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, type TwoFactorStart } from "./api";
 import { IconCheck } from "./icons";
+import { tr, useT } from "./i18n";
 
 /** Campo per il codice a 6 cifre dell'app di autenticazione. */
 export function CodeField(props: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
@@ -14,7 +15,7 @@ export function CodeField(props: { value: string; onChange: (v: string) => void;
       placeholder="123 456"
       maxLength={7}
       autoFocus={props.autoFocus}
-      aria-label="Codice a 6 cifre"
+      aria-label={tr("tf.codeAria")}
     />
   );
 }
@@ -40,13 +41,13 @@ function download(name: string, text: string) {
 
 /** Codici di recupero, mostrati una sola volta. */
 export function RecoveryCodes(props: { codes: string[]; onDone: () => void; doneLabel?: string }) {
+  const t = useT();
   const [saved, setSaved] = useState(false);
-  const text = `OtterRoute · codici di recupero\n\n${props.codes.join("\n")}\n`;
+  const text = `${t("tf.recoveryHead")}\n\n${props.codes.join("\n")}\n`;
   return (
     <div>
       <div className="box warn">
-        <strong>Conservali adesso.</strong> Non verranno mostrati di nuovo. Ognuno vale una volta sola e serve se perdi
-        il telefono.
+        <strong>{t("tf.saveNow")}</strong> {t("tf.saveNowText")}
       </div>
       <ul className="rcodes">
         {props.codes.map((c) => (
@@ -57,20 +58,20 @@ export function RecoveryCodes(props: { codes: string[]; onDone: () => void; done
       </ul>
       <div className="actions">
         <button className="secondary small" onClick={() => copy(props.codes.join("\n"))}>
-          Copia
+          {t("common.copy")}
         </button>
-        <button className="secondary small" onClick={() => download("otterroute-codici-di-recupero.txt", text)}>
-          Scarica
+        <button className="secondary small" onClick={() => download(t("tf.recoveryFile"), text)}>
+          {t("tf.download")}
         </button>
       </div>
       <label className="check mt">
         <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-        <span>Ho salvato i codici in un posto sicuro.</span>
+        <span>{t("tf.saved")}</span>
       </label>
       <div className="nav">
         <span />
         <button className="primary" disabled={!saved} onClick={props.onDone}>
-          {props.doneLabel ?? "Fine"}
+          {props.doneLabel ?? t("common.done")}
         </button>
       </div>
     </div>
@@ -79,6 +80,7 @@ export function RecoveryCodes(props: { codes: string[]; onDone: () => void; done
 
 /** Attivazione della 2FA: QR → codice di conferma → codici di recupero. */
 export function TwoFactorSetup(props: { onDone: () => void; onCancel?: () => void }) {
+  const t = useT();
   const [start, setStart] = useState<TwoFactorStart | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [code, setCode] = useState("");
@@ -109,26 +111,26 @@ export function TwoFactorSetup(props: { onDone: () => void; onCancel?: () => voi
     }
   };
 
-  if (codes) return <RecoveryCodes codes={codes} onDone={props.onDone} doneLabel="Fine" />;
-  if (!start) return err ? <div className="box bad">{err}</div> : <p className="muted">Preparo il codice…</p>;
+  if (codes) return <RecoveryCodes codes={codes} onDone={props.onDone} doneLabel={t("common.done")} />;
+  if (!start) return err ? <div className="box bad">{err}</div> : <p className="muted">{t("tf.preparing")}</p>;
 
   return (
     <form onSubmit={confirm} className="tf-setup">
       <div className="tf-grid">
-        <div className="qr" aria-label="Codice QR" dangerouslySetInnerHTML={{ __html: start.qr_svg ?? "" }} />
+        <div className="qr" aria-label={t("tf.qrAria")} dangerouslySetInnerHTML={{ __html: start.qr_svg ?? "" }} />
         <div>
           <ol className="tf-steps">
-            <li>Apri la tua app di autenticazione (Google Authenticator, 1Password, Authy…).</li>
-            <li>Scansiona il codice QR.</li>
-            <li>Scrivi qui il codice a 6 cifre che l’app mostra.</li>
+            <li>{t("tf.step1")}</li>
+            <li>{t("tf.step2")}</li>
+            <li>{t("tf.step3")}</li>
           </ol>
           <details className="tf-manual">
-            <summary>Non riesci a scansionare?</summary>
-            <p className="small-text muted">Aggiungi un account a mano con questa chiave:</p>
+            <summary>{t("tf.cantScan")}</summary>
+            <p className="small-text muted">{t("tf.manual")}</p>
             <div className="secret">
               <code>{group(start.secret)}</code>
               <button type="button" className="ghost small" onClick={() => copy(start.secret)}>
-                Copia
+                {t("common.copy")}
               </button>
             </div>
           </details>
@@ -139,13 +141,13 @@ export function TwoFactorSetup(props: { onDone: () => void; onCancel?: () => voi
       <div className="nav">
         {props.onCancel ? (
           <button type="button" className="ghost" onClick={props.onCancel}>
-            Annulla
+            {t("common.cancel")}
           </button>
         ) : (
           <span />
         )}
         <button className="primary" disabled={busy || code.replace(/\s/g, "").length !== 6}>
-          <IconCheck /> {busy ? "Verifico…" : "Conferma e attiva"}
+          <IconCheck /> {busy ? t("tf.verifying") : t("tf.confirm")}
         </button>
       </div>
     </form>

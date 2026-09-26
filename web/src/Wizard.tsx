@@ -6,9 +6,10 @@ import { BucketForm } from "./pages/Buckets";
 import { DomainForm } from "./pages/Domains";
 import { RuleForm } from "./pages/Routes";
 import { setupComplete, setupSteps } from "./setup";
+import { trn, useT, type Key } from "./i18n";
 import { Illus, Modal } from "./ui";
 
-const LABELS = ["Dominio", "Bucket", "Instradamento"];
+const LABELS: Key[] = ["wiz.domain", "wiz.bucket", "wiz.route"];
 
 /** Configurazione guidata: dominio → bucket → instradamento, con i moduli di sempre. */
 export function Wizard(props: {
@@ -17,6 +18,7 @@ export function Wizard(props: {
   go: (p: PageId) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const { state, refresh } = props;
   const steps = setupSteps(state);
   const [step, setStep] = useState(() => {
@@ -45,21 +47,21 @@ export function Wizard(props: {
       <>
         {doneBox(
           <>
-            Hai già {verified.length === 1 ? "un dominio verificato" : `${verified.length} domini verificati`}:{" "}
+            {trn("wiz.hasDomains", verified.length)}{" "}
             <code>{verified.map((d) => d.host).join(", ")}</code>
           </>,
         )}
         <div className="nav">
           <span />
           <button className="primary" onClick={next}>
-            Continua
+            {t("common.continue")}
           </button>
         </div>
       </>
     ) : (
       <>
-        <p className="lead small-lead">{steps[0].text} Puoi censirlo anche se il DNS non è ancora pronto: il nodo lo ricontrolla da solo.</p>
-        <DomainForm state={state} cancelLabel="Salta" onCancel={next} onSaved={advance} />
+        <p className="lead small-lead">{t("wiz.domainNote", { text: steps[0].text })}</p>
+        <DomainForm state={state} cancelLabel={t("common.skip")} onCancel={next} onSaved={advance} />
       </>
     );
   } else if (step === 1) {
@@ -67,23 +69,22 @@ export function Wizard(props: {
       <>
         {doneBox(
           <>
-            Hai già {state.panel.buckets.length === 1 ? "un bucket" : `${state.panel.buckets.length} bucket`} collegat
-            {state.panel.buckets.length === 1 ? "o" : "i"}.
+            {trn("wiz.hasBuckets", state.panel.buckets.length)}
           </>,
         )}
         <div className="nav">
           <button className="ghost" onClick={() => setStep(0)}>
-            Indietro
+            {t("common.back")}
           </button>
           <button className="primary" onClick={next}>
-            Continua
+            {t("common.continue")}
           </button>
         </div>
       </>
     ) : (
       <>
-        <p className="lead small-lead">{steps[1].text} Le chiavi restano su questo nodo e non vengono mai mostrate.</p>
-        <BucketForm cancelLabel="Indietro" onCancel={() => setStep(0)} onSaved={advance} />
+        <p className="lead small-lead">{t("wiz.bucketNote", { text: steps[1].text })}</p>
+        <BucketForm cancelLabel={t("common.back")} onCancel={() => setStep(0)} onSaved={advance} />
       </>
     );
   } else if (step === 2) {
@@ -91,8 +92,7 @@ export function Wizard(props: {
       <>
         {pending > 0 && verified.length === 0 && (
           <div className="box warn">
-            Il dominio è in attesa di verifica: appena passa i controlli potrai creare l’instradamento. Puoi chiudere la
-            procedura e riprenderla dall’avviso in alto.
+            {t("wiz.pending")}
           </div>
         )}
         <p className="lead small-lead">{steps[2].text}</p>
@@ -102,7 +102,7 @@ export function Wizard(props: {
             props.onClose();
             props.go(p);
           }}
-          cancelLabel="Indietro"
+          cancelLabel={t("common.back")}
           onCancel={() => setStep(1)}
           onSaved={advance}
         />
@@ -113,11 +113,9 @@ export function Wizard(props: {
     body = (
       <div className="wdone">
         <Illus name={ready ? "verified" : "sleeping"} width={110} />
-        <h3>{ready ? "Tutto pronto!" : "Manca ancora qualcosa"}</h3>
+        <h3>{ready ? t("wiz.ready") : t("wiz.notReady")}</h3>
         <p className="muted">
-          {ready
-            ? "Il primo instradamento è attivo: i file del bucket vengono già serviti con la cache. Prova un file dalla pagina Instradamenti."
-            : "Puoi riprendere la configurazione in qualsiasi momento dall’avviso in alto."}
+          {ready ? t("wiz.readyText") : t("wiz.notReadyText")}
         </p>
         <div className="actions center">
           {ready && (
@@ -128,11 +126,11 @@ export function Wizard(props: {
                 props.go("routes");
               }}
             >
-              Vai agli instradamenti
+              {t("wiz.goRoutes")}
             </button>
           )}
           <button className="primary" onClick={props.onClose}>
-            Chiudi
+            {t("common.close")}
           </button>
         </div>
       </div>
@@ -140,8 +138,8 @@ export function Wizard(props: {
   }
 
   return (
-    <Modal title="Configurazione guidata" onClose={props.onClose} wide>
-      <ol className="wsteps" aria-label="Avanzamento">
+    <Modal title={t("wiz.title")} onClose={props.onClose} wide>
+      <ol className="wsteps" aria-label={t("wiz.progress")}>
         {LABELS.map((label, i) => {
           const done = steps[i].done;
           const cls = i === step ? "on" : done ? "done" : "";
@@ -149,7 +147,7 @@ export function Wizard(props: {
             <li key={label} className={cls}>
               <button type="button" onClick={() => setStep(i)} aria-current={i === step ? "step" : undefined}>
                 <span className="dot">{done && i !== step ? <IconCheck /> : i + 1}</span>
-                <span className="wl">{label}</span>
+                <span className="wl">{t(label)}</span>
               </button>
             </li>
           );

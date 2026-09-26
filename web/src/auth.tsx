@@ -1,19 +1,16 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { SessionUser } from "./api";
+import { it, tr, type Key } from "./i18n";
 
-export const ROLE_LABEL: Record<string, string> = {
-  admin: "Amministratore",
-  operator: "Operatore",
-  viewer: "Sola lettura",
-  custom: "Personalizzato",
-};
+/** Le etichette si leggono al momento dell'uso, così seguono la lingua scelta. */
+const dyn = (prefix: string): Record<string, string> =>
+  new Proxy({} as Record<string, string>, {
+    get: (_, k) => (typeof k === "string" && `${prefix}.${k}` in it ? tr(`${prefix}.${k}` as Key) : undefined),
+  });
 
-export const ROLE_HELP: Record<string, string> = {
-  admin: "Può fare tutto, compresa la gestione di utenti e sicurezza.",
-  operator: "Legge e modifica domini, bucket e instradamenti; vede le statistiche. Niente impostazioni né utenti.",
-  viewer: "Vede domini, bucket, instradamenti e statistiche, senza poter modificare nulla.",
-  custom: "Scegli gli scope uno per uno.",
-};
+export const ROLE_LABEL = dyn("role");
+
+export const ROLE_HELP = dyn("roleHelp");
 
 interface Ctx {
   user: SessionUser;
@@ -37,4 +34,4 @@ export function useAuth(): Ctx {
 }
 
 /** Testo per i pulsanti disabilitati per mancanza di permesso. */
-export const needScope = (scope: string) => `Serve lo scope ${scope}`;
+export const needScope = (scope: string) => tr("auth.needScope", { scope });
