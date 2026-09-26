@@ -1,19 +1,25 @@
 ## [Non rilasciato]
 
+## [0.1.2] - 2026-09-26
+
+### Aggiunto
+- **Interfaccia in italiano e inglese**: selettore nel menu utente e nella schermata di accesso (lingua del browser al primo accesso, poi la scelta salvata), date e numeri nel formato della lingua, messaggi d'errore comuni e descrizioni dei permessi tradotti, link «?» alla guida nella lingua scelta. I messaggi dinamici del server (con nomi e numeri) restano in italiano.
+- **Backup e ripristino dal pannello**: un file `.otrbak` cifrato (AES-256-GCM, Argon2id) con utenti, chiavi, certificati e configurazione; ripristino con controllo preventivo, rifiuto di backup di versioni più recenti, copia dello stato precedente e riavvio del nodo. Scope `users:manage`.
+- **Notifiche** (email/Telegram) anche per nuove versioni, rollback di un aggiornamento e certificati in scadenza o scaduti, compresi quelli caricati a mano. Le notifiche di versione seguono l'interruttore del controllo aggiornamenti.
+- **Indirizzi ammessi per il pannello in HTTPS**: elenco di IP e reti CIDR (Impostazioni → Pannello in HTTPS, `PUT /api/admin-allow`); gli altri ricevono 404, la porta locale resta sempre aperta e dal pannello HTTPS non ci si può escludere da soli.
+- **Metriche Prometheus** per immagini al volo, link firmati, certificati (scadenza e stato di servizio), emissioni ACME, controlli e aggiornamenti, più `otterroute_build_info`. Query e allarmi di esempio nella guida.
+
+### Modificato
+- Rilascio: l'immagine Docker non ricompila più il codice (in emulazione arm64 richiedeva circa un'ora): usa i pacchetti già costruiti e firmati dal job dei binari (`Dockerfile.release`). Il `Dockerfile` per costruire dai sorgenti non cambia.
+
 ### Corretto
 - Controllo versioni: tra due pre-release con lo stesso numero (`rc1`, `rc2`) il nodo sceglieva la più vecchia e non vedeva `rc2` come aggiornamento. Ora il confronto segue semver (`rc2` > `rc1`, `rc10` > `rc2`, la finale batte ogni rc).
 - Auto-aggiornamento a una pre-release: il binario di una release dichiara ora la versione del tag (es. `0.1.2-rc1`), altrimenti il nodo rifiutava l'aggiornamento («non dichiara la versione»). Trovato provando l'aggiornamento dal vivo da 0.1.1 a `v0.1.2-rc1`.
 - Guida: dietro Cloudflare (nuvola arancione) l'emissione ACME non «fallisce» sempre; riesce se la sfida non viene reindirizzata a HTTPS. Aggiunti i passi per farla passare.
 
-### Modificato
-- Rilascio: l'immagine Docker non ricompila più il codice (in emulazione arm64 richiedeva circa un'ora): usa i pacchetti già costruiti e firmati dal job dei binari (`Dockerfile.release`). Il `Dockerfile` per costruire dai sorgenti non cambia.
-
-### Aggiunto
-- Interfaccia multilingua, prima fase: modulo di traduzione interno (`web/src/i18n`), selettore IT/EN nel menu utente (lingua del browser al primo accesso, poi scelta salvata), date e numeri nel formato della lingua. Il pannello è ora tradotto in italiano e inglese (pagine, menu, avvisi, accesso e 2FA); anche i messaggi d'errore più comuni del server e le descrizioni dei permessi sono tradotti, e i link «?» aprono la guida nella lingua scelta. I messaggi dinamici del server (con nomi e numeri) restano in italiano.
-- **Backup e ripristino dal pannello**: un file `.otrbak` cifrato (AES-256-GCM, Argon2id) con utenti, chiavi, certificati e configurazione; ripristino con controllo preventivo, rifiuto di backup di versioni più recenti, copia dello stato precedente e riavvio del nodo. Scope `users:manage`.
-- **Notifiche** (email/Telegram) anche per nuove versioni, rollback di un aggiornamento e certificati in scadenza o scaduti, compresi quelli caricati a mano. Le notifiche di versione seguono l'interruttore del controllo aggiornamenti.
-- **Indirizzi ammessi per il pannello in HTTPS**: elenco di IP e reti CIDR (Impostazioni → Pannello in HTTPS, `PUT /api/admin-allow`); gli altri ricevono 404, la porta locale resta sempre aperta e dal pannello HTTPS non ci si può escludere da soli.
-- **Metriche Prometheus** per immagini al volo, link firmati, certificati (scadenza e stato di servizio), emissioni ACME, controlli e aggiornamenti, più `otterroute_build_info`. Query e allarmi di esempio nella guida.
+### Note
+- Da una `0.1.1` l'auto-aggiornamento porta alla `0.1.2` finale. Le pre-release (`0.1.2-rc*`) non sono raggiungibili con l'auto-aggiornamento dalla `0.1.1`: il confronto delle versioni è stato corretto in questa release.
+- L'immagine Docker si costruisce ora dai pacchetti già firmati (build di rilascio da circa un'ora a circa dieci minuti).
 
 ## [0.1.1] - 2026-09-26
 
@@ -48,6 +54,7 @@
 - L'emissione dei certificati è provata contro un server ACME di test (Pebble), non su domini reali in produzione; il rinnovo automatico non è stato provato oltre la logica delle scadenze.
 - Le schede dei provider si basano sulla documentazione ufficiale e non sono state provate con account reali.
 
-[Non rilasciato]: https://github.com/garzuu/OtterRoute/compare/v0.1.1...HEAD
+[Non rilasciato]: https://github.com/garzuu/OtterRoute/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/garzuu/OtterRoute/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/garzuu/OtterRoute/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/garzuu/OtterRoute/releases/tag/v0.1.0
