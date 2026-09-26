@@ -1,18 +1,16 @@
-# Changelog
-
-Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e il progetto usa il [versionamento semantico](https://semver.org/lang/it/).
-
 ## [Non rilasciato]
 
-### Aggiunto
-- **Auto-aggiornamento del binario** (installazioni `binary` e `service`): *Aggiorna ora* dal pannello o `otterroute --self-update`; scarica solo da GitHub, verifica SHA-256 e firma Ed25519 (chiave pubblica nel binario), prova il nuovo eseguibile (`--version`, `--self-check`), salva un backup dello stato, sostituisce eseguibile, pannello e guida, si riavvia con `exec` e, se per 3 avvii non arriva la conferma, torna alla versione precedente. Opzionale e spento di default: applicazione automatica delle sole versioni di correzione in una finestra oraria.
-- `scripts/install.sh` (verifica checksum e firma, crea utente e servizio systemd), `--healthcheck` e `HEALTHCHECK` nell'immagine Docker, `SHA256SUMS` e firme nelle release.
+## [0.1.1] - 2026-09-26
 
 ### Aggiunto
-- **Controllo delle nuove versioni**: una richiesta al giorno alle release di GitHub (spegnibile, `OTR_UPDATE_CHECK=off`), avviso nella campanella, scheda *Aggiornamenti* in Impostazioni con i passi per Docker, servizio, binario e sorgenti, avviso «aggiornato da A a B». Nuova pagina della guida per Docker (tag, Compose, Watchtower).
-
-### Aggiunto
+- **Auto-aggiornamento del binario** (installazioni `binary` e `service`): *Aggiorna ora* dal pannello o `otterroute --self-update`. Scarica solo da GitHub, verifica SHA-256 e **firma Ed25519** (chiave pubblica nel binario), prova il nuovo eseguibile (`--version`, `--self-check`), salva un backup dello stato, sostituisce eseguibile, pannello e guida, si riavvia con `exec` e, se per 3 avvii non arriva la conferma, torna alla versione precedente. Opzionale e spento di default: applicazione automatica delle sole versioni di correzione in una finestra oraria.
+- **Controllo delle nuove versioni**: una richiesta al giorno alle release di GitHub (spegnibile con `OTR_UPDATE_CHECK=off`), avviso nella campanella, scheda *Aggiornamenti* in Impostazioni con i passi per Docker, servizio, binario e sorgenti, avviso «aggiornato da A a B» e avviso di rollback.
 - **Pannello in HTTPS**: il pannello si può servire anche su un dominio del nodo con il suo certificato (Impostazioni → Pannello in HTTPS), con redirect da HTTP, cookie `Secure` e la porta locale sempre attiva.
+- `scripts/install.sh` (verifica checksum e firma, crea utente e servizio systemd), `--healthcheck` e `HEALTHCHECK` nell'immagine Docker, `SHA256SUMS`, firme e `install.sh` tra gli asset di ogni release.
+- Guida: pagine *Docker* e *Pannello in HTTPS*, sezione *Aggiornamenti* riscritta per tipo di installazione, diagrammi SVG.
+
+### Note
+- La `0.1.0` non contiene l'auto-aggiornamento: per arrivare alla `0.1.1` da una `0.1.0` l'aggiornamento è manuale (o con `scripts/install.sh`).
 
 ## [0.1.0] - 2026-09-26
 
@@ -35,5 +33,6 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e i
 - L'emissione dei certificati è provata contro un server ACME di test (Pebble), non su domini reali in produzione; il rinnovo automatico non è stato provato oltre la logica delle scadenze.
 - Le schede dei provider si basano sulla documentazione ufficiale e non sono state provate con account reali.
 
-[Non rilasciato]: https://github.com/garzuu/OtterRoute/compare/v0.1.0...HEAD
+[Non rilasciato]: https://github.com/garzuu/OtterRoute/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/garzuu/OtterRoute/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/garzuu/OtterRoute/releases/tag/v0.1.0
