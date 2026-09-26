@@ -2,6 +2,9 @@
 
 Ogni file richiesto viene tenuto su disco. Le richieste successive partono dal disco senza toccare lo storage.
 
+![Sezione «Cache» della riga di un instradamento: svuota e precarica](/screens/routes.jpg)
+<p class="shot-caption">Sezione «Cache» della riga di un instradamento: svuota e precarica · 26/09/2026</p>
+
 ## Cosa dice `X-Cache`
 
 | Valore | Significato |

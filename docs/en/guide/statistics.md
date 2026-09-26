@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 The node counts public traffic and shows it in the panel's **Overview**; the same counters are available in Prometheus format.
 
+![The Overview: requests, cache hits, bandwidth, errors and latency](/screens/overview.jpg)
+<p class="shot-caption">The Overview: requests, cache hits, bandwidth, errors and latency · 26/09/2026</p>
+
 ## What is measured
 
 For every public request:

@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 When a file does not open, the **Diagnosis** page follows the request's path and tells you **where it stops and what to do**. Just paste the file's address, for example `https://cdn.example.com/photos/boat.jpg` (the `routes:read` scope is required). From a route's row, the **Diagnosis** button opens the page already filled in.
 
+![Diagnosis of a file: every step with its result](/screens/diagnosis.jpg)
+<p class="shot-caption">Diagnosis of a file: every step with its result · 26/09/2026</p>
+
 ## The steps
 
 | Step | What it checks | If it fails |

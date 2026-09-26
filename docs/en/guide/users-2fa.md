@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 The panel supports several users, each with their own permissions, and two-step verification. The first user created at startup is **Administrator**.
 
+![Users and roles, with the security policy](/screens/users.jpg)
+<p class="shot-caption">Users and roles, with the security policy · 26/09/2026</p>
+
 ## Roles and scopes
 
 A **role** is a set of **scopes**, that is, of allowed actions. Every action in the panel requires a specific scope and the server checks it on every request.

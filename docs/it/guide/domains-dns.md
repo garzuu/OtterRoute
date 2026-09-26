@@ -2,6 +2,9 @@
 
 Un dominio è utilizzabile solo dopo essere stato **verificato**. La verifica non si limita a controllare che il nome esista: prova che una richiesta al dominio arrivi *a questo nodo*, qualunque strada faccia.
 
+![Un dominio in attesa: il passaggio DNS fallisce e il secondo viene saltato](/screens/domains.jpg)
+<p class="shot-caption">Un dominio in attesa: il passaggio DNS fallisce e il secondo viene saltato · 26/09/2026</p>
+
 ## Cosa controlla la verifica
 
 Per ogni dominio il pannello esegue in sequenza:

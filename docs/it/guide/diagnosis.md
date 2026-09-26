@@ -2,6 +2,9 @@
 
 Quando un file non si apre, la pagina **Diagnosi** segue il percorso della richiesta e ti dice **dove si ferma e cosa fare**. Basta incollare l'indirizzo del file, per esempio `https://cdn.example.com/foto/barca.jpg` (serve lo scope `routes:read`). Dalla riga di un instradamento il pulsante **Diagnosi** apre la pagina già compilata.
 
+![Diagnosi di un file: ogni passaggio con il suo esito](/screens/diagnosis.jpg)
+<p class="shot-caption">Diagnosi di un file: ogni passaggio con il suo esito · 26/09/2026</p>
+
 ## I passaggi
 
 | Passaggio | Cosa controlla | Se fallisce |

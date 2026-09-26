@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 Every requested file is kept on disk. Later requests are served from disk without touching the storage.
 
+![The “Cache” section of a route's row: purge and warm](/screens/routes.jpg)
+<p class="shot-caption">The “Cache” section of a route's row: purge and warm · 26/09/2026</p>
+
 ## What `X-Cache` says
 
 | Value | Meaning |

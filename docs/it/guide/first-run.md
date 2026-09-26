@@ -2,6 +2,9 @@
 
 Un nodo appena installato è vuoto: nessun utente, nessun dominio, nessuno storage.
 
+![La Panoramica di un nodo con un po' di traffico](/screens/overview.jpg)
+<p class="shot-caption">La Panoramica di un nodo con un po' di traffico · 26/09/2026</p>
+
 ## 1. Crea l'amministratore
 
 Apri il pannello a `http://127.0.0.1:9090/`. Se sei su un server remoto **non aprire la porta 9090**: usa un tunnel SSH e apri l'indirizzo dal tuo computer.

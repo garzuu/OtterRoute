@@ -2,6 +2,9 @@
 
 Un bucket è uno storage compatibile S3 (AWS, Cloudflare R2, Backblaze B2, Wasabi, MinIO…) da cui OtterRoute legge i file. Si aggiunge da **Bucket → Nuovo bucket**.
 
+![I bucket censiti, con lo stato dell'ultima verifica](/screens/buckets.jpg)
+<p class="shot-caption">I bucket censiti, con lo stato dell'ultima verifica · 26/09/2026</p>
+
 ## I campi
 
 | Campo | Cosa inserire |

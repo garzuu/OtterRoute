@@ -5,6 +5,9 @@ source_commit: dd1d866
 
 A domain is usable only after being **verified**. Verification does not stop at checking that the name exists: it proves that a request to the domain reaches *this node*, whatever path it takes.
 
+![A pending domain: the DNS step fails and the second is skipped](/screens/domains.jpg)
+<p class="shot-caption">A pending domain: the DNS step fails and the second is skipped · 26/09/2026</p>
+
 ## What verification checks
 
 For each domain the panel runs in sequence:
