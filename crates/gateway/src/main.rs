@@ -12,6 +12,7 @@ mod dns;
 mod docs_check;
 mod duration;
 mod handler;
+mod imgx;
 mod metrics;
 mod notify;
 mod panel;

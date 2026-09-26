@@ -19,6 +19,8 @@ source_commit: dd1d866
 
 **Endpoint** — address of the S3 service (`https://s3.example.com`).
 
+**Images on the fly** — resizing and converting an image at request time, with `?w=&h=&fmt=`. → [Images on the fly](./images)
+
 **Route** — rule *domain + prefix → destination + cache policy*.
 
 **Signed link** — address with `exp` (expiry) and `sig` (signature) that lets you open a restricted file for a limited time. → [Signed links](./signed-links)

@@ -157,6 +157,9 @@ pub struct RawRoute {
     /// richiede un link firmato con scadenza (`?exp=&sig=`)
     #[serde(default)]
     pub signed_urls: bool,
+    /// trasforma le immagini al volo (`?w=&h=&fit=&fmt=&q=`)
+    #[serde(default)]
+    pub image_transform: bool,
 }
 
 fn default_region() -> String {
@@ -226,6 +229,7 @@ pub struct Route {
     pub path_prefix: String,
     pub strip_prefix: bool,
     pub signed: bool,
+    pub images: bool,
     pub dest: Destination,
     pub policy: CachePolicy,
 }
@@ -439,6 +443,7 @@ pub fn validate(rc: RawConfig, env: &dyn Fn(&str) -> Option<String>) -> anyhow::
                 path_prefix: prefix,
                 strip_prefix: r.strip_prefix,
                 signed: r.signed_urls,
+                images: r.image_transform,
                 dest: dest.clone(),
                 policy: policy.clone(),
             }));

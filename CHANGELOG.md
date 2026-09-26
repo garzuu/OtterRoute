@@ -5,6 +5,7 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e i
 ## [Non rilasciato]
 
 ### Aggiunto
+- **Immagini al volo** (`?w=&h=&fit=&fmt=&q=`): ridimensionamento e conversione in WebP/JPEG/PNG per instradamento, varianti in cache, originale scaricato una sola volta, limiti di dimensione, pixel e tempo, esecuzione a concorrenza limitata.
 - **HTTPS automatico**: certificati gratuiti per i domini verificati (ACME, sfida HTTP-01) con rinnovo 30 giorni prima della scadenza, listener TLS con scelta per nome (SNI), redirect HTTP → HTTPS per dominio, caricamento di certificati propri, stato nella tabella Domini e avvisi/notifiche. Nuove opzioni `OTR_HTTPS_LISTEN`, `OTR_ACME_DIRECTORY`, `OTR_ACME_CA_ROOT`.
 - **Link firmati** con scadenza (`?exp=&sig=`, HMAC-SHA256 con la chiave del nodo): per instradamento, verificati prima della cache, con creazione dal pannello, rotazione della chiave e passo dedicato nella Diagnosi.
 

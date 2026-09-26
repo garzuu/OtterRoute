@@ -142,6 +142,9 @@ pub struct Rule {
     /// i file si servono solo con un link firmato e con scadenza
     #[serde(default)]
     pub signed: bool,
+    /// trasforma le immagini al volo (`?w=&h=&fmt=&q=`)
+    #[serde(default)]
+    pub images: bool,
 }
 
 fn first_generation() -> u64 {
@@ -208,6 +211,7 @@ pub fn generate_config(panel: &Panel, version: u64, secrets: &Path) -> Value {
             "destination": r.id,
             "cache_policy": "standard",
             "signed_urls": r.signed,
+            "image_transform": r.images,
         }));
     }
     json!({
@@ -257,6 +261,7 @@ mod tests {
                 folder: "foto/".into(),
                 cache_generation: 4,
                 signed: true,
+                images: true,
             }],
             ..Panel::default()
         };
@@ -264,6 +269,7 @@ mod tests {
         let snap = crate::config::parse(yaml.as_bytes()).unwrap();
         assert_eq!(snap.version, 3);
         assert!(snap.routes_by_host["img.example.com"][0].signed);
+        assert!(snap.routes_by_host["img.example.com"][0].images);
         assert_eq!(
             yaml.matches("cache_generation: 4").count(),
             1,

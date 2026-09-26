@@ -28,7 +28,7 @@ const ACTION_LABEL: Record<string, string> = {
   "bucket.delete": "Bucket eliminato",
   "rule.add": "Instradamento creato",
   "rule.delete": "Instradamento eliminato",
-  "rule.signed": "Link firmati (instradamento)",
+  "rule.options": "Opzioni dell’instradamento",
   "link.create": "Link firmato creato",
   "link.rotate": "Chiave dei link ruotata",
   "https.update": "HTTPS automatico modificato",

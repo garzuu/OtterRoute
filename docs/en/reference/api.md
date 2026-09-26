@@ -34,7 +34,7 @@ Authentication: session cookie obtained with `POST /api/login`. Requests with a 
 | `POST /api/rules`, `DELETE /api/rules/{id}` | `routes:write` |
 | `POST /api/probe` | `routes:read` |
 | `POST /api/purge`, `POST /api/warm` | `routes:write` |
-| `PUT /api/rules/{id}` (enable/disable signed links), `POST /api/links` | `routes:write` |
+| `PUT /api/rules/{id}` (signed links and images on the fly), `POST /api/links` | `routes:write` |
 | `POST /api/links/rotate` | `settings:write` |
 | `POST /api/diagnose` | `routes:read` |
 | `/api/users`, `/api/audit`, `/api/policy` | `users:manage` |

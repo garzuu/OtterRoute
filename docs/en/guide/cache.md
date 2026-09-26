@@ -52,7 +52,7 @@ From **Routes**, expand a route's row: in the **Cache** section you find three a
 | **Purge all** | Empties the route's cache with one click and a confirmation. Nothing is deleted from disk: it increases the route's `cache_generation`, so old copies become unreachable and the LRU removes them. |
 | **Warm** | List up to 200 files, one per line: the node requests them by itself, one at a time, so the first visit is already a `HIT`. For each file you see status, `X-Cache`, bytes and time. Warming stops after 2 minutes; remaining files are reported as not run. |
 
-Purging does not delete the file from the storage nor from any caches in front of the node (CDN, browser): those have their own timing.
+If the route has [images on the fly](./images), *Purge file* removes only the original: variants expire by themselves or are removed with *Purge all*. Purging does not delete the file from the storage nor from any caches in front of the node (CDN, browser): those have their own timing.
 
 In a hand-written configuration the same effect is obtained by increasing a destination's `cache_generation`.
 
