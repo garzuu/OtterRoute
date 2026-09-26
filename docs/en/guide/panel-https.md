@@ -36,6 +36,20 @@ To disable it: `-d '{"host":null}'` or *Disable* in Settings.
 - The local port `127.0.0.1:9090` keeps working, independently of this setting: if the certificate expires or something breaks, you are not locked out.
 - You cannot delete the domain or add routes to it while the panel is active on it.
 
+## Restricting addresses
+
+You can admit **only certain addresses**: *Settings → Panel over HTTPS* shows *Allowed addresses*, one IP or CIDR network per line (`203.0.113.7`, `10.0.0.0/8`, `2001:db8::/32`). With an empty list the panel is open to everyone (login still required).
+
+- Anyone not on the list gets **404**, as if the domain had no panel.
+- The local port `127.0.0.1:9090` is always open: if you get the list wrong, fix it from there (or over the SSH tunnel).
+- Over HTTPS you cannot save a list that excludes your own address.
+- The node checks the connection address, not `X-Forwarded-For` headers: behind Cloudflare it would see Cloudflare's IPs. In that case restrict access with Cloudflare rules (Access, WAF).
+
+```sh
+curl -s -b /tmp/otr.jar -H 'Content-Type: application/json' -X PUT \
+  http://127.0.0.1:9090/api/admin-allow -d '{"list":["203.0.113.0/24"]}'
+```
+
 ## Behind Cloudflare
 
 With the orange cloud, set SSL/TLS to **Full** (or Full strict with an origin certificate). In **Flexible** Cloudflare talks to the node over HTTP and the panel would redirect forever. The node does not use `X-Forwarded-*` headers.

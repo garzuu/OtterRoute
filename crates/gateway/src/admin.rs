@@ -33,11 +33,24 @@ const MAX_BODY: usize = 64 * 1024;
 #[derive(Default)]
 pub struct AdminGate {
     host: std::sync::RwLock<Option<String>>,
+    allow: std::sync::RwLock<Vec<String>>,
 }
 
 impl AdminGate {
     pub fn set(&self, host: Option<String>) {
         *self.host.write().unwrap() = host;
+    }
+    pub fn set_allow(&self, list: Vec<String>) {
+        *self.allow.write().unwrap() = list;
+    }
+    /// Il client può aprire il pannello? Senza indirizzo noto vale l'elenco vuoto.
+    pub fn allows<B>(&self, req: &Request<B>) -> bool {
+        let list = self.allow.read().unwrap();
+        list.is_empty()
+            || req
+                .extensions()
+                .get::<crate::tls::Peer>()
+                .is_some_and(|p| crate::allow::allows(&list, p.0))
     }
     pub fn get(&self) -> Option<String> {
         self.host.read().unwrap().clone()
@@ -52,6 +65,8 @@ impl AdminGate {
 tokio::task_local! {
     /// la richiesta arriva su una connessione TLS: il cookie di sessione diventa `Secure`
     static SECURE: bool;
+    /// indirizzo del client quando la richiesta arriva dal listener HTTPS
+    static SECURE_PEER: Option<std::net::IpAddr>;
 }
 
 /// Il pannello servito dal listener pubblico HTTPS.
@@ -59,7 +74,10 @@ pub async fn handle_secure(
     admin: Arc<Admin>,
     req: Request<hyper::body::Incoming>,
 ) -> Result<Response<Body>, Infallible> {
-    SECURE.scope(true, handle(admin, req)).await
+    let peer = req.extensions().get::<crate::tls::Peer>().map(|p| p.0);
+    SECURE
+        .scope(true, SECURE_PEER.scope(peer, handle(admin, req)))
+        .await
 }
 
 pub struct Admin {
@@ -155,9 +173,11 @@ pub fn access(method: &Method, path: &str) -> Option<Access> {
     Some(match (m, path) {
         ("GET", "/api/panel") => Open,
         ("GET", "/api/metrics") => Scope("metrics:read"),
-        ("PUT", "/api/settings" | "/api/https" | "/api/admin-host" | "/api/updates") => {
-            Scope("settings:write")
-        }
+        (
+            "PUT",
+            "/api/settings" | "/api/https" | "/api/admin-host" | "/api/admin-allow"
+            | "/api/updates",
+        ) => Scope("settings:write"),
         ("POST", "/api/update/check" | "/api/update/apply") => Scope("settings:write"),
         (
             "POST",
@@ -263,6 +283,7 @@ async fn api(
         (&Method::POST, "/api/update/check") => update_check(admin, pr).await,
         (&Method::POST, "/api/update/apply") => update_apply(admin),
         (&Method::PUT, "/api/admin-host") => with_body!(AdminHostReq, set_admin_host),
+        (&Method::PUT, "/api/admin-allow") => with_body!(AdminAllowReq, set_admin_allow),
         (&Method::POST, "/api/certs/issue") => with_body!(HostReq, issue_cert),
         (&Method::POST, "/api/certs/upload") => with_body!(UploadCertReq, upload_cert),
         (&Method::POST, "/api/domains/redirect") => with_body!(RedirectReq, set_redirect),
@@ -1274,6 +1295,45 @@ async fn set_admin_host(admin: &Admin, req: AdminHostReq) -> Response<Body> {
         StatusCode::OK,
         json!({ "host": host, "url": url, "warnings": warnings }),
     )
+}
+
+#[derive(Deserialize)]
+struct AdminAllowReq {
+    list: Vec<String>,
+}
+
+async fn set_admin_allow(admin: &Admin, req: AdminAllowReq) -> Response<Body> {
+    let list = match crate::allow::parse_list(&req.list) {
+        Ok(l) => l,
+        Err(e) => return bad(&e),
+    };
+    // dal pannello in HTTPS non ci si può chiudere fuori da soli
+    if let Some(peer) = SECURE_PEER.try_with(|p| *p).ok().flatten() {
+        if !crate::allow::allows(&list, peer) {
+            return bad(
+                "l'elenco non comprende il tuo indirizzo: ti chiuderesti fuori dal pannello",
+            );
+        }
+    }
+    let _g = admin.write_lock.lock().await;
+    let mut p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    p.settings.admin_allow = list.clone();
+    if let Err(r) = save_panel(admin, &p) {
+        return r;
+    }
+    admin.gate.set_allow(list.clone());
+    audit::log(
+        "admin.allow",
+        &if list.is_empty() {
+            "nessuna restrizione".to_string()
+        } else {
+            list.join(", ")
+        },
+    );
+    json(StatusCode::OK, json!({ "list": list }))
 }
 
 // --- HTTPS ------------------------------------------------------------------

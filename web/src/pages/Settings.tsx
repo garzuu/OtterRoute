@@ -88,6 +88,22 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
     }
   };
 
+  const [allowText, setAllowText] = useState(state.panel.settings.admin_allow.join("\n"));
+  const saveAllow = async () => {
+    setAdminBusy(true);
+    setAdminMsg(null);
+    try {
+      const r = await api.setAdminAllow(allowText.split(/[\s,]+/).filter(Boolean));
+      await refresh();
+      setAllowText(r.list.join("\n"));
+      setAdminMsg({ ok: true, text: r.list.length ? "Indirizzi ammessi salvati." : "Nessuna restrizione: il pannello in HTTPS è aperto a tutti gli indirizzi." });
+    } catch (e) {
+      setAdminMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
   const up = state.update;
   const [upBusy, setUpBusy] = useState(false);
   const [upMsg, setUpMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -244,6 +260,20 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
                 </option>
               ))}
             </select>
+          </Field>
+        )}
+        {adminHost && (
+          <Field label="Indirizzi ammessi (facoltativo)">
+            <textarea rows={3} value={allowText} onChange={(e) => setAllowText(e.target.value)} disabled={!canWrite} placeholder={"203.0.113.7\n10.0.0.0/8\n2001:db8::/32"} />
+            <span className="muted small-text">
+              Un IP o una rete CIDR per riga. Vuoto = tutti. Gli altri ricevono 404; la porta locale resta sempre aperta. Dietro Cloudflare vedresti gli IP di Cloudflare, non quelli dei visitatori.
+            </span>
+            <div className="nav">
+              <span />
+              <button className="secondary" onClick={saveAllow} disabled={adminBusy || !canWrite}>
+                Salva elenco
+              </button>
+            </div>
           </Field>
         )}
         {adminMsg && <div className={`box ${adminMsg.ok ? "good" : "bad"}`}>{adminMsg.text}</div>}
