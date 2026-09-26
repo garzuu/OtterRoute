@@ -1,0 +1,30 @@
+<svg class="dg" viewBox="0 0 900 280" role="img" aria-labelledby="t-domain-check" xmlns="http://www.w3.org/2000/svg"><style>
+svg { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+.dg-box { fill: #f6f6f7; stroke: #d0d0d5; stroke-width: 1.5; }
+.dg-soft { fill: #efeff1; stroke: #d0d0d5; stroke-width: 1.5; }
+.dg-brand { fill: #e3f1f2; stroke: #0e7f8a; stroke-width: 1.5; }
+.dg-brand2 { fill: #ffffff; stroke: #0e7f8a; stroke-width: 1.5; }
+.dg-good { fill: #dff3e8; stroke: #18794e; stroke-width: 1.5; }
+.dg-warn { fill: #f7ecd9; stroke: #915930; stroke-width: 1.5; }
+.dg-bad { fill: #f8e1e2; stroke: #b8272c; stroke-width: 1.5; }
+.dg-t { fill: #3c3c43; font-size: 16px; font-weight: 600; }
+.dg-m { fill: #5b5b63; font-size: 13.5px; }
+.dg-l { fill: #3c3c43; font-size: 14px; font-weight: 500; }
+.dg-h { fill: #0e7f8a; font-size: 15px; font-weight: 600; }
+.dg-line { stroke: #5b5b63; stroke-width: 1.6; }
+.dg-head { fill: #5b5b63; }
+@media (prefers-color-scheme: dark) {
+.dg-box { fill: #202127; stroke: #3a3a40; }
+.dg-soft { fill: #1a1b20; stroke: #3a3a40; }
+.dg-brand { fill: #16323a; stroke: #3fb6c2; }
+.dg-brand2 { fill: #14151a; stroke: #3fb6c2; }
+.dg-good { fill: #14342a; stroke: #3dd68c; }
+.dg-warn { fill: #3a2e14; stroke: #f9b44e; }
+.dg-bad { fill: #3a1a20; stroke: #f66f81; }
+.dg-t, .dg-l { fill: #ececf1; }
+.dg-m { fill: #a6a6b3; }
+.dg-h { fill: #3fb6c2; }
+.dg-line { stroke: #a6a6b3; }
+.dg-head { fill: #a6a6b3; }
+}
+</style><title id="t-domain-check">Come si verifica un dominio</title><defs><marker id="a-domain-check" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="dg-head"/></marker></defs><rect x="10" y="70" width="130" height="76" rx="10" class="dg-brand2"/><text x="75.0" y="104.0" class="dg-t" text-anchor="middle">Pannello</text><text x="75.0" y="122.0" class="dg-m" text-anchor="middle">ogni 5 o 15 min</text><rect x="190" y="40" width="210" height="136" rx="10" class="dg-box"/><text x="295.0" y="95.0" class="dg-t" text-anchor="middle">1 · Il dominio risolve?</text><text x="295.0" y="113.0" class="dg-m" text-anchor="middle">record A/AAAA</text><text x="295.0" y="131.0" class="dg-m" text-anchor="middle">senza /etc/hosts</text><rect x="450" y="40" width="240" height="136" rx="10" class="dg-box"/><text x="570.0" y="86.0" class="dg-t" text-anchor="middle">2 · Il nodo risponde?</text><text x="570.0" y="104.0" class="dg-m" text-anchor="middle">HTTP alla porta 80</text><text x="570.0" y="122.0" class="dg-m" text-anchor="middle">Host: il dominio</text><text x="570.0" y="140.0" class="dg-m" text-anchor="middle">/.well-known/otterroute/check</text><rect x="740" y="70" width="150" height="76" rx="10" class="dg-good"/><text x="815.0" y="95.0" class="dg-t" text-anchor="middle">Verificato</text><text x="815.0" y="113.0" class="dg-m" text-anchor="middle">prova valida:</text><text x="815.0" y="131.0" class="dg-m" text-anchor="middle">sha256(nodo:nonce)</text><rect x="190" y="206" width="210" height="56" rx="10" class="dg-bad"/><text x="295.0" y="230.0" class="dg-t" text-anchor="middle">Errore DNS</text><text x="295.0" y="248.0" class="dg-m" text-anchor="middle">nessun record trovato</text><rect x="450" y="206" width="240" height="56" rx="10" class="dg-bad"/><text x="570.0" y="230.0" class="dg-t" text-anchor="middle">Nodo non raggiungibile</text><text x="570.0" y="248.0" class="dg-m" text-anchor="middle">nessuna risposta o altro server</text><path d="M140 108 L190 108" class="dg-line" fill="none" marker-end="url(#a-domain-check)"/><path d="M400 108 L450 108" class="dg-line" fill="none" marker-end="url(#a-domain-check)"/><path d="M690 108 L740 108" class="dg-line" fill="none" marker-end="url(#a-domain-check)"/><path d="M295 176 L295 206" class="dg-line" fill="none" marker-end="url(#a-domain-check)"/><path d="M570 176 L570 206" class="dg-line" fill="none" marker-end="url(#a-domain-check)"/></svg>

@@ -6,6 +6,10 @@
 Gli SVG sono "in linea" e usano le variabili di colore di VitePress, così
 seguono il tema chiaro/scuro. I file non hanno righe vuote né rientri: il
 markdown li include con <!--@include: @/diagrams/nome.lingua.svg-->.
+
+Per il README (e ovunque l'SVG sia usato come <img>, dove le variabili CSS della guida
+non esistono) si generano anche versioni autonome in docs/diagrams/standalone/, con i
+colori incorporati e il tema chiaro/scuro via prefers-color-scheme.
 """
 import os
 from html import escape
@@ -203,6 +207,44 @@ CACHE = {
                nf="404", nf2="missing (remembered 60 s)", err="502", err2="credentials or storage"),
 }
 
+STANDALONE_CSS = """<style>
+svg { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+.dg-box { fill: #f6f6f7; stroke: #d0d0d5; stroke-width: 1.5; }
+.dg-soft { fill: #efeff1; stroke: #d0d0d5; stroke-width: 1.5; }
+.dg-brand { fill: #e3f1f2; stroke: #0e7f8a; stroke-width: 1.5; }
+.dg-brand2 { fill: #ffffff; stroke: #0e7f8a; stroke-width: 1.5; }
+.dg-good { fill: #dff3e8; stroke: #18794e; stroke-width: 1.5; }
+.dg-warn { fill: #f7ecd9; stroke: #915930; stroke-width: 1.5; }
+.dg-bad { fill: #f8e1e2; stroke: #b8272c; stroke-width: 1.5; }
+.dg-t { fill: #3c3c43; font-size: 16px; font-weight: 600; }
+.dg-m { fill: #5b5b63; font-size: 13.5px; }
+.dg-l { fill: #3c3c43; font-size: 14px; font-weight: 500; }
+.dg-h { fill: #0e7f8a; font-size: 15px; font-weight: 600; }
+.dg-line { stroke: #5b5b63; stroke-width: 1.6; }
+.dg-head { fill: #5b5b63; }
+@media (prefers-color-scheme: dark) {
+.dg-box { fill: #202127; stroke: #3a3a40; }
+.dg-soft { fill: #1a1b20; stroke: #3a3a40; }
+.dg-brand { fill: #16323a; stroke: #3fb6c2; }
+.dg-brand2 { fill: #14151a; stroke: #3fb6c2; }
+.dg-good { fill: #14342a; stroke: #3dd68c; }
+.dg-warn { fill: #3a2e14; stroke: #f9b44e; }
+.dg-bad { fill: #3a1a20; stroke: #f66f81; }
+.dg-t, .dg-l { fill: #ececf1; }
+.dg-m { fill: #a6a6b3; }
+.dg-h { fill: #3fb6c2; }
+.dg-line { stroke: #a6a6b3; }
+.dg-head { fill: #a6a6b3; }
+}
+</style>"""
+
+
+def standalone(svg_text):
+    """Stessa figura, ma con gli stili dentro il file (per <img>, README)."""
+    head, rest = svg_text.split(">", 1)
+    return head + ">" + STANDALONE_CSS + rest
+
+
 DIAGRAMS = {
     "request-flow": (request_flow, REQ),
     "architecture": (architecture, ARCH),
@@ -217,4 +259,7 @@ if __name__ == "__main__":
         for lang, L in labels.items():
             with open(os.path.join(OUT, f"{name}.{lang}.svg"), "w", encoding="utf-8") as f:
                 f.write(fn(L) + "\n")
+            os.makedirs(os.path.join(OUT, "standalone"), exist_ok=True)
+            with open(os.path.join(OUT, "standalone", f"{name}.{lang}.svg"), "w", encoding="utf-8") as f:
+                f.write(standalone(fn(L)) + "\n")
     print(f"{len(DIAGRAMS) * 2} diagrammi in {os.path.normpath(OUT)}")

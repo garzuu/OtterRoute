@@ -37,7 +37,7 @@ Hai file in uno o più bucket S3 (AWS, Cloudflare R2, Backblaze B2, Wasabi, Hetz
 Colleghi lo storage, associ un dominio, e ottieni un URL che funziona. Il nodo **verifica davvero** che il dominio arrivi a lui, tiene i file in cache su disco e ti dice, in italiano, dove si ferma una richiesta quando qualcosa non va.
 
 <p align="center">
-  <img src="docs/diagrams/architecture.it.svg" alt="Architettura: visitatori, domini, nodo OtterRoute con cache su disco, bucket S3" width="760">
+  <img src="docs/diagrams/standalone/architecture.it.svg" alt="Architettura: visitatori, domini, nodo OtterRoute con cache su disco, bucket S3" width="760">
 </p>
 
 ## Cosa fa

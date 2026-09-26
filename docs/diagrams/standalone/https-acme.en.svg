@@ -1,0 +1,30 @@
+<svg class="dg" viewBox="0 0 900 330" role="img" aria-labelledby="t-https-acme" xmlns="http://www.w3.org/2000/svg"><style>
+svg { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+.dg-box { fill: #f6f6f7; stroke: #d0d0d5; stroke-width: 1.5; }
+.dg-soft { fill: #efeff1; stroke: #d0d0d5; stroke-width: 1.5; }
+.dg-brand { fill: #e3f1f2; stroke: #0e7f8a; stroke-width: 1.5; }
+.dg-brand2 { fill: #ffffff; stroke: #0e7f8a; stroke-width: 1.5; }
+.dg-good { fill: #dff3e8; stroke: #18794e; stroke-width: 1.5; }
+.dg-warn { fill: #f7ecd9; stroke: #915930; stroke-width: 1.5; }
+.dg-bad { fill: #f8e1e2; stroke: #b8272c; stroke-width: 1.5; }
+.dg-t { fill: #3c3c43; font-size: 16px; font-weight: 600; }
+.dg-m { fill: #5b5b63; font-size: 13.5px; }
+.dg-l { fill: #3c3c43; font-size: 14px; font-weight: 500; }
+.dg-h { fill: #0e7f8a; font-size: 15px; font-weight: 600; }
+.dg-line { stroke: #5b5b63; stroke-width: 1.6; }
+.dg-head { fill: #5b5b63; }
+@media (prefers-color-scheme: dark) {
+.dg-box { fill: #202127; stroke: #3a3a40; }
+.dg-soft { fill: #1a1b20; stroke: #3a3a40; }
+.dg-brand { fill: #16323a; stroke: #3fb6c2; }
+.dg-brand2 { fill: #14151a; stroke: #3fb6c2; }
+.dg-good { fill: #14342a; stroke: #3dd68c; }
+.dg-warn { fill: #3a2e14; stroke: #f9b44e; }
+.dg-bad { fill: #3a1a20; stroke: #f66f81; }
+.dg-t, .dg-l { fill: #ececf1; }
+.dg-m { fill: #a6a6b3; }
+.dg-h { fill: #3fb6c2; }
+.dg-line { stroke: #a6a6b3; }
+.dg-head { fill: #a6a6b3; }
+}
+</style><title id="t-https-acme">Automatic HTTPS with ACME (HTTP-01 challenge)</title><defs><marker id="a-https-acme" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="dg-head"/></marker></defs><rect x="10" y="96" width="140" height="76" rx="10" class="dg-soft"/><text x="80.0" y="130.0" class="dg-t" text-anchor="middle">Browser</text><text x="80.0" y="148.0" class="dg-m" text-anchor="middle">asks for the domain</text><rect x="250" y="20" width="270" height="260" rx="14" class="dg-brand"/><text x="266" y="44" class="dg-h" text-anchor="start">OtterRoute node</text><rect x="270" y="54" width="230" height="62" rx="10" class="dg-brand2"/><text x="385.0" y="81.0" class="dg-t" text-anchor="middle">HTTPS · port 443</text><text x="385.0" y="99.0" class="dg-m" text-anchor="middle">certificate chosen by name (SNI)</text><rect x="270" y="130" width="230" height="62" rx="10" class="dg-brand2"/><text x="385.0" y="157.0" class="dg-t" text-anchor="middle">HTTP · port 80</text><text x="385.0" y="175.0" class="dg-m" text-anchor="middle">answers the challenge</text><rect x="270" y="214" width="230" height="46" rx="10" class="dg-box"/><text x="385.0" y="242.0" class="dg-t" text-anchor="middle">certs/domain/ · key 0600</text><rect x="730" y="66" width="160" height="140" rx="10" class="dg-soft"/><text x="810.0" y="132.0" class="dg-t" text-anchor="middle">Let&#x27;s Encrypt</text><text x="810.0" y="150.0" class="dg-m" text-anchor="middle">ACME authority</text><path d="M150 85 L270 85" class="dg-line" fill="none" marker-end="url(#a-https-acme)"/><text x="210" y="74" class="dg-l" text-anchor="middle">HTTPS</text><path d="M520 100 L730 100" class="dg-line" fill="none" marker-end="url(#a-https-acme)"/><text x="625" y="88" class="dg-l" text-anchor="middle">1 · orders</text><path d="M730 150 L500 150" class="dg-line" fill="none" marker-end="url(#a-https-acme)"/><text x="625" y="138" class="dg-l" text-anchor="middle">2 · checks on :80</text><path d="M520 196 L730 196" class="dg-line" fill="none" marker-end="url(#a-https-acme)"/><text x="625" y="184" class="dg-l" text-anchor="middle">3 · downloads</text><text x="385" y="312" class="dg-m" text-anchor="middle">automatic renewal 30 days before expiry</text></svg>
