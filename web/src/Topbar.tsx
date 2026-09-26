@@ -114,7 +114,7 @@ export function Topbar(props: {
 
   return (
     <header className="topbar">
-      <button className="icon-btn ghost" onClick={props.onToggleSidebar} aria-label="Mostra o nascondi il menu">
+      <button className="icon-btn ghost" onClick={props.onToggleSidebar} aria-label={t("top.toggleMenu")}>
         <IconMenu />
       </button>
       <div className="spacer" />
@@ -130,15 +130,15 @@ export function Topbar(props: {
             }}
             aria-haspopup="dialog"
             aria-expanded={help.open}
-            aria-label="Guida"
-            title="Guida"
+            aria-label={t("top.help")}
+            title={t("top.help")}
           >
             ?
           </button>
           {help.open && (
-            <Popover label="Guida">
-              <div className="pop-head">Guida</div>
-              <div className="help-sub">In questa pagina</div>
+            <Popover label={t("top.help")}>
+              <div className="pop-head">{t("top.help")}</div>
+              <div className="help-sub">{t("top.helpHere")}</div>
               <div className="help-links">
                 {HELP[props.page].map(([label, to]) => (
                   <a key={to} href={docsHref(to) ?? "#"} target="_blank" rel="noreferrer" onClick={() => help.setOpen(false)}>
@@ -146,13 +146,13 @@ export function Topbar(props: {
                   </a>
                 ))}
               </div>
-              <div className="help-sub">Altro</div>
+              <div className="help-sub">{t("top.helpMore")}</div>
               <div className="help-links">
                 <a href={docsHref("guide/troubleshooting") ?? "#"} target="_blank" rel="noreferrer">
-                  Risoluzione dei problemi <span>↗</span>
+                  {t("top.troubleshooting")} <span>↗</span>
                 </a>
                 <a href={docsHref("") ?? "#"} target="_blank" rel="noreferrer">
-                  Tutta la guida <span>↗</span>
+                  {t("top.allGuide")} <span>↗</span>
                 </a>
               </div>
             </Popover>
@@ -170,17 +170,17 @@ export function Topbar(props: {
           }}
           aria-haspopup="dialog"
           aria-expanded={bell.open}
-          aria-label={count ? `Avvisi: ${count}` : "Nessun avviso"}
+          aria-label={count ? t("top.alertsN", { n: count }) : t("top.noAlertsAria")}
         >
           <IconBell />
           {count > 0 && <span className={errors ? "bell-count bad" : warns ? "bell-count" : "bell-count info"}>{count}</span>}
         </button>
         {bell.open && (
-          <Popover label="Avvisi">
-            <div className="pop-head">Avvisi</div>
+          <Popover label={t("top.alerts")}>
+            <div className="pop-head">{t("top.alerts")}</div>
             {count === 0 ? (
               <div className="pop-empty">
-                <IconCheck /> Nessun avviso: è tutto in ordine.
+                <IconCheck /> {t("top.allGood")}
               </div>
             ) : (
               <ul className="alert-list">
@@ -223,7 +223,7 @@ export function Topbar(props: {
           <IconChevronDown className="chev" />
         </button>
         {user.open && (
-          <Popover label="Account">
+          <Popover label={t("top.account")}>
             <div className="profile">
               <img src="/brand/avatar.png" alt="" width={48} height={48} />
               <div>

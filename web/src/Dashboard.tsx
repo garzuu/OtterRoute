@@ -1,3 +1,4 @@
+import { tr, type Key } from "./i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api, type PanelState } from "./api";
 import { buildAlerts } from "./alerts";
@@ -20,15 +21,15 @@ import { canSetup } from "./setup";
 export type PageId = "overview" | "domains" | "buckets" | "routes" | "diagnosis" | "notifications" | "settings" | "users" | "profile";
 
 /** Voci della sidebar; `scope` è ciò che serve per vederle. */
-const NAV: { id: PageId; label: string; Icon: typeof IconOverview; scope?: string }[] = [
-  { id: "overview", label: "Panoramica", Icon: IconOverview },
-  { id: "domains", label: "Domini", Icon: IconDomains, scope: "domains:read" },
-  { id: "buckets", label: "Bucket", Icon: IconBuckets, scope: "buckets:read" },
-  { id: "routes", label: "Instradamenti", Icon: IconRoutes, scope: "routes:read" },
-  { id: "users", label: "Utenti", Icon: IconUsers, scope: "users:manage" },
-  { id: "diagnosis", label: "Diagnosi", Icon: IconDiagnosis, scope: "routes:read" },
-  { id: "notifications", label: "Notifiche", Icon: IconBell, scope: "notifications:manage" },
-  { id: "settings", label: "Impostazioni", Icon: IconSettings },
+const NAV: { id: PageId; label: Key; Icon: typeof IconOverview; scope?: string }[] = [
+  { id: "overview", label: "nav.overview", Icon: IconOverview },
+  { id: "domains", label: "nav.domains", Icon: IconDomains, scope: "domains:read" },
+  { id: "buckets", label: "nav.buckets", Icon: IconBuckets, scope: "buckets:read" },
+  { id: "routes", label: "nav.routes", Icon: IconRoutes, scope: "routes:read" },
+  { id: "users", label: "nav.users", Icon: IconUsers, scope: "users:manage" },
+  { id: "diagnosis", label: "nav.diagnosis", Icon: IconDiagnosis, scope: "routes:read" },
+  { id: "notifications", label: "nav.notifications", Icon: IconBell, scope: "notifications:manage" },
+  { id: "settings", label: "nav.settings", Icon: IconSettings },
 ];
 
 const PAGES: PageId[] = ["overview", "domains", "buckets", "routes", "diagnosis", "notifications", "settings", "users", "profile"];
@@ -144,18 +145,18 @@ export function Dashboard(props: { username: string; onLoggedOut: () => void; on
           <img className="logo-img" src="/logo-tile.png" alt="" width={32} height={32} />
           <span className="brand-name">OtterRoute</span>
         </div>
-        <nav aria-label="Sezioni">
+        <nav aria-label={tr("nav.sections")}>
           {NAV.filter((n) => !n.scope || can(n.scope)).map((n) => (
             <button
               key={n.id}
               className={n.id === page ? "nav-item on" : "nav-item"}
               onClick={() => navigate(n.id)}
-              title={n.label}
-              aria-label={n.label}
+              title={tr(n.label)}
+              aria-label={tr(n.label)}
               aria-current={n.id === page ? "page" : undefined}
             >
               <n.Icon className="ico" />
-              <span className="label">{n.label}</span>
+              <span className="label">{tr(n.label)}</span>
             </button>
           ))}
         </nav>
