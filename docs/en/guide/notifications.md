@@ -14,8 +14,8 @@ The same alerts as the panel's bell:
 
 | Level | When |
 |---|---|
-| **Error** | A domain that was valid no longer resolves or no longer leads to the node; a bucket is unreachable; the storage rejects the credentials or the read. |
-| **Warning** | A new domain is still waiting for DNS propagation; a bucket has not been verified yet; the test file is missing. |
+| **Error** | A domain that was valid no longer resolves or no longer leads to the node; a bucket is unreachable; the storage rejects the credentials or the read; a certificate has expired; an update failed and the node rolled back. |
+| **Warning** | A new domain is still waiting for DNS propagation; a bucket has not been verified yet; the test file is missing; a certificate expires within 14 days (automatic renewal failed, or it was uploaded by hand and you must renew it); a new version is available. |
 
 They are not notified at every check, only when **the state changes**:
 

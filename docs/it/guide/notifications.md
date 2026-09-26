@@ -11,8 +11,8 @@ Gli stessi avvisi della campanella del pannello:
 
 | Livello | Quando |
 |---|---|
-| **Errore** | Un dominio che era valido non risolve più o non porta più al nodo; un bucket non è raggiungibile; lo storage rifiuta le credenziali o la lettura. |
-| **Avviso** | Un dominio nuovo è ancora in attesa della propagazione DNS; un bucket non è ancora stato verificato; il file di prova non c'è. |
+| **Errore** | Un dominio che era valido non risolve più o non porta più al nodo; un bucket non è raggiungibile; lo storage rifiuta le credenziali o la lettura; un certificato è scaduto; un aggiornamento automatico non è riuscito e il nodo è tornato indietro (rollback). |
+| **Avviso** | Un dominio nuovo è ancora in attesa della propagazione DNS; un bucket non è ancora stato verificato; il file di prova non c'è; un certificato scade entro 14 giorni (il rinnovo automatico non è riuscito, oppure è caricato a mano e va rinnovato da te); è disponibile una nuova versione. |
 
 Non si notificano a ogni controllo, ma solo quando **lo stato cambia**:
 
