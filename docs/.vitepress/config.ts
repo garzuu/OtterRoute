@@ -69,7 +69,8 @@ export default defineConfig({
   // i file sorgente italiani stanno in it/ ma si servono dalla radice del sito
   rewrites: { "it/:rest*": ":rest*" },
   cleanUrls: true,
-  lastUpdated: true,
+  // "ultimo aggiornamento" legge la cronologia git: nell'immagine Docker non c'è (DOCS_LAST_UPDATED=0)
+  lastUpdated: process.env.DOCS_LAST_UPDATED !== "0",
   head: [["link", { rel: "icon", type: "image/png", href: `${base}favicon.png` }]],
   locales: {
     root: { label: "Italiano", lang: "it", themeConfig: localeTheme("it") },
