@@ -46,6 +46,18 @@ export function rich(text: string): ReactNode[] {
   });
 }
 
+let serverKeys: Map<string, Key> | null = null;
+
+/** Messaggio arrivato dal server (scritto in italiano): se è noto lo traduce, altrimenti lo lascia com'è. */
+export function srv(text: string): string {
+  if (!serverKeys) {
+    serverKeys = new Map();
+    for (const k of Object.keys(it) as Key[]) if (k.startsWith("srv.")) serverKeys.set(it[k], k);
+  }
+  const k = serverKeys.get(text);
+  return k ? tr(k) : text;
+}
+
 /** Plurali: cerca `<chiave>.one` / `<chiave>.other` secondo la lingua; `{n}` è il numero. */
 export function trn(key: string, n: number, p?: Params): string {
   const cat = new Intl.PluralRules(LOCALES[current]).select(n) === "one" ? "one" : "other";

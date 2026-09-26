@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type AuditEntry, type ScopeInfo, type TwoFactorPolicy, type UserInfo } from "../api";
 import { ROLE_HELP, ROLE_LABEL, useAuth } from "../auth";
 import { DataTable, type Column } from "../DataTable";
-import { it, rich, tr, trn, type Key } from "../i18n";
+import { it, rich, srv, tr, trn, type Key } from "../i18n";
 import { DeleteButton, EmptyState, Field, Modal, Page, fmtTime } from "../ui";
 
 const ROLES = ["admin", "operator", "viewer", "custom"];
@@ -288,7 +288,7 @@ function UserModal(props: {
               <input type="checkbox" checked={custom.includes(s.id)} onChange={() => toggle(s.id)} />
               <span>
                 <code>{s.id}</code>
-                <span className="muted block small-text">{s.description}</span>
+                <span className="muted block small-text">{srv(s.description)}</span>
               </span>
             </label>
           ))}
