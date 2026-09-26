@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { loc, tr } from "./i18n";
 import { IconCheck, IconMinus, IconX } from "./icons";
 
 export function Field(props: { label: string; hint?: ReactNode; children: ReactNode }) {
@@ -74,11 +75,11 @@ export const fmtBytes = (n: number): string => {
     i++;
   }
   const digits = i === 0 ? 0 : v < 10 ? 2 : v < 100 ? 1 : 0;
-  return `${v.toLocaleString("it-IT", { maximumFractionDigits: digits, minimumFractionDigits: 0 })} ${units[i]}`;
+  return `${v.toLocaleString(loc(), { maximumFractionDigits: digits, minimumFractionDigits: 0 })} ${units[i]}`;
 };
 
 export const fmtTime = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" }) : "mai";
+  iso ? new Date(iso).toLocaleString(loc(), { dateStyle: "short", timeStyle: "short" }) : tr("common.never");
 
 /** Finestra sopra la pagina; si chiude con Esc o cliccando fuori. */
 export function Modal(props: { title: string; onClose: () => void; wide?: boolean; children: ReactNode }) {

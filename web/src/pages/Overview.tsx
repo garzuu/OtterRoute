@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type MetricsRange, type MetricsResponse, type PanelState } from "../api";
 import { HBars, Histogram, Meter, RequestsChart, fmtMs, fmtNum, fmtPct } from "../charts";
 import { DataTable, type Column } from "../DataTable";
+import { loc } from "../i18n";
 import { useAuth } from "../auth";
 import { canSetup, setupDone, setupSteps } from "../setup";
 import { EmptyState, Illus, Page, fmtBytes } from "../ui";
@@ -172,7 +173,7 @@ export function Overview(props: { state: PanelState; onWizard: () => void }) {
           <h2>Latenza</h2>
           {data && (
             <Histogram
-              bins={data.latency_histogram.map((b) => ({ label: b.le === null ? ">2,5s" : b.le >= 1000 ? `${(b.le / 1000).toLocaleString("it-IT")}s` : `${b.le}`, count: b.count }))}
+              bins={data.latency_histogram.map((b) => ({ label: b.le === null ? ">2,5s" : b.le >= 1000 ? `${(b.le / 1000).toLocaleString(loc())}s` : `${b.le}`, count: b.count }))}
             />
           )}
           <p className="muted small-text mt">Millisecondi fino alla risposta.</p>

@@ -2,10 +2,12 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, type TwoFactorPolicy, type UserInfo } from "../api";
 import { ROLE_HELP, ROLE_LABEL, useAuth } from "../auth";
 import { RecoveryCodes, TwoFactorSetup, CodeField } from "../TwoFactor";
+import { useT } from "../i18n";
 import { Modal, Page, fmtTime } from "../ui";
 
 /** Il mio profilo: dati, password e verifica in due passaggi. */
 export function Profile() {
+  const t = useT();
   const { user, reloadSession } = useAuth();
   const [me, setMe] = useState<UserInfo | null>(null);
   const [policy, setPolicy] = useState<TwoFactorPolicy>("off");
@@ -32,20 +34,20 @@ export function Profile() {
   const required = policy === "all" || (policy === "managers" && user.scopes.includes("users:manage"));
 
   return (
-    <Page title="Il mio profilo" lead="Le tue credenziali e la sicurezza del tuo account.">
+    <Page title={t("profile.title")} lead={t("profile.lead")}>
       <div className="card">
-        <h2>Account</h2>
+        <h2>{t("profile.account")}</h2>
         <dl className="kv">
-          <dt>Utente</dt>
+          <dt>{t("profile.user")}</dt>
           <dd>
             <strong>{user.username}</strong>
           </dd>
-          <dt>Ruolo</dt>
+          <dt>{t("profile.role")}</dt>
           <dd>
             {ROLE_LABEL[user.role] ?? user.role}
             <div className="muted small-text">{ROLE_HELP[user.role]}</div>
           </dd>
-          <dt>Permessi</dt>
+          <dt>{t("profile.scopes")}</dt>
           <dd>
             <div className="chips">
               {user.scopes.map((s) => (
@@ -57,7 +59,7 @@ export function Profile() {
           </dd>
           {me && (
             <>
-              <dt>Ultimo accesso</dt>
+              <dt>{t("profile.lastLogin")}</dt>
               <dd>{fmtTime(me.last_login_at)}</dd>
             </>
           )}
@@ -68,29 +70,28 @@ export function Profile() {
 
       <div className="card">
         <div className="head">
-          <h2>Verifica in due passaggi</h2>
-          <span className={user.two_factor ? "badge good" : "badge"}>{user.two_factor ? "Attiva" : "Non attiva"}</span>
+          <h2>{t("tfa.title")}</h2>
+          <span className={user.two_factor ? "badge good" : "badge"}>{user.two_factor ? t("tfa.on") : t("tfa.off")}</span>
         </div>
         <p className="lead small-lead">
-          Oltre alla password serve un codice a 6 cifre generato da un’app di autenticazione sul tuo telefono. Anche chi
-          scoprisse la password non potrebbe entrare.
+          {t("tfa.lead")}
         </p>
-        {required && !user.two_factor && <div className="box warn">Il criterio di sicurezza richiede la 2FA per il tuo account.</div>}
+        {required && !user.two_factor && <div className="box warn">{t("tfa.policy")}</div>}
         <div className="actions">
           {!user.two_factor ? (
             <button className="primary" onClick={() => setModal("setup")}>
-              Attiva la 2FA
+              {t("tfa.enable")}
             </button>
           ) : (
             <>
               <button className="secondary" onClick={() => setModal("recovery")}>
-                Rigenera i codici di recupero
+                {t("tfa.regen")}
               </button>
               {required ? (
-                <span className="muted small-text">Non si può disattivare: il criterio la richiede.</span>
+                <span className="muted small-text">{t("tfa.locked")}</span>
               ) : (
                 <button className="ghost" onClick={() => setModal("disable")}>
-                  Disattiva
+                  {t("common.disable")}
                 </button>
               )}
             </>
@@ -99,7 +100,7 @@ export function Profile() {
       </div>
 
       {modal === "setup" && (
-        <Modal title="Attiva la verifica in due passaggi" onClose={() => setModal(null)} wide>
+        <Modal title={t("tfa.setupTitle")} onClose={() => setModal(null)} wide>
           <TwoFactorSetup onDone={done} onCancel={() => setModal(null)} />
         </Modal>
       )}
@@ -110,6 +111,7 @@ export function Profile() {
 }
 
 function PasswordCard() {
+  const t = useT();
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
@@ -126,7 +128,7 @@ function PasswordCard() {
       setCur("");
       setNext("");
       setAgain("");
-      setMsg({ ok: true, text: "Password cambiata. Le tue altre sessioni sono state chiuse." });
+      setMsg({ ok: true, text: t("pw.changed") });
     } catch (x) {
       setMsg({ ok: false, text: (x as Error).message });
     } finally {
@@ -136,32 +138,32 @@ function PasswordCard() {
 
   return (
     <div className="card">
-      <h2>Password</h2>
+      <h2>{t("pw.title")}</h2>
       <form onSubmit={submit}>
         <div className="row">
           <label className="field">
-            <span className="flabel">Password attuale</span>
+            <span className="flabel">{t("pw.current")}</span>
             <input type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" />
           </label>
           <span />
         </div>
         <div className="row">
           <label className="field">
-            <span className="flabel">Nuova password</span>
+            <span className="flabel">{t("pw.new")}</span>
             <input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" />
-            <span className="hint">Almeno 10 caratteri.</span>
+            <span className="hint">{t("pw.min")}</span>
           </label>
           <label className="field">
-            <span className="flabel">Ripeti la nuova password</span>
+            <span className="flabel">{t("pw.again")}</span>
             <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" />
-            {again && next !== again && <span className="hint bad-text">Non coincidono.</span>}
+            {again && next !== again && <span className="hint bad-text">{t("pw.mismatch")}</span>}
           </label>
         </div>
         {msg && <div className={`box ${msg.ok ? "good" : "bad"}`}>{msg.text}</div>}
         <div className="nav">
           <span />
           <button className="primary" disabled={!valid || busy}>
-            {busy ? "Attendi…" : "Cambia password"}
+            {busy ? t("common.wait") : t("pw.change")}
           </button>
         </div>
       </form>
@@ -170,6 +172,7 @@ function PasswordCard() {
 }
 
 function RecoveryModal(props: { onClose: () => void }) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [codes, setCodes] = useState<string[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -189,25 +192,25 @@ function RecoveryModal(props: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="Codici di recupero" onClose={props.onClose}>
+    <Modal title={t("tfa.recoveryTitle")} onClose={props.onClose}>
       {codes ? (
         <RecoveryCodes codes={codes} onDone={props.onClose} />
       ) : (
         <form onSubmit={submit}>
           <p className="lead small-lead">
-            Genera dieci codici nuovi: quelli vecchi smettono di funzionare. Conferma con la tua password.
+            {t("tfa.recoveryLead")}
           </p>
           <label className="field">
-            <span className="flabel">Password</span>
+            <span className="flabel">{t("common.password")}</span>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
           </label>
           {err && <div className="box bad">{err}</div>}
           <div className="nav">
             <button type="button" className="ghost" onClick={props.onClose}>
-              Annulla
+              {t("common.cancel")}
             </button>
             <button className="primary" disabled={!password || busy}>
-              {busy ? "Attendi…" : "Genera codici nuovi"}
+              {busy ? t("common.wait") : t("tfa.recoveryGo")}
             </button>
           </div>
         </form>
@@ -217,6 +220,7 @@ function RecoveryModal(props: { onClose: () => void }) {
 }
 
 function DisableModal(props: { onClose: () => void; onDone: () => void }) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -236,21 +240,21 @@ function DisableModal(props: { onClose: () => void; onDone: () => void }) {
   };
 
   return (
-    <Modal title="Disattiva la 2FA" onClose={props.onClose}>
+    <Modal title={t("tfa.disableTitle")} onClose={props.onClose}>
       <form onSubmit={submit}>
-        <p className="lead small-lead">Per sicurezza servono la tua password e un codice valido dell’app.</p>
+        <p className="lead small-lead">{t("tfa.disableLead")}</p>
         <label className="field">
-          <span className="flabel">Password</span>
+          <span className="flabel">{t("common.password")}</span>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
         </label>
         <CodeField value={code} onChange={setCode} />
         {err && <div className="box bad">{err}</div>}
         <div className="nav">
           <button type="button" className="ghost" onClick={props.onClose}>
-            Annulla
+            {t("common.cancel")}
           </button>
           <button className="danger" disabled={!password || code.replace(/\s/g, "").length !== 6 || busy}>
-            {busy ? "Attendi…" : "Disattiva"}
+            {busy ? t("common.wait") : t("common.disable")}
           </button>
         </div>
       </form>

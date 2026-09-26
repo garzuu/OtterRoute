@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, domainStatus, type PanelState, type ProbeResult, type RuleInfo, type WarmResult } from "../api";
+import { loc } from "../i18n";
 import { useAuth } from "../auth";
 import { DataTable, type Column } from "../DataTable";
 import type { PageId } from "../Dashboard";
@@ -369,7 +370,7 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
           {link && (
             <div className="box good">
               <div>
-                Scade il <strong>{new Date(link.expires_at * 1000).toLocaleString("it-IT")}</strong>
+                Scade il <strong>{new Date(link.expires_at * 1000).toLocaleString(loc())}</strong>
               </div>
               <div className="inline tight">
                 <input readOnly value={link.url} aria-label="Link firmato" onFocus={(e) => e.currentTarget.select()} />

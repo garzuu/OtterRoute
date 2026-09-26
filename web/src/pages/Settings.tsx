@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, type PanelState } from "../api";
+import { loc } from "../i18n";
 import { useAuth, needScope } from "../auth";
 import { Field, Page } from "../ui";
 import { BackupCard } from "./BackupCard";
@@ -326,7 +327,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
           <div className="box good">{up.checked_at ? "Sei alla versione più recente." : "Ancora nessun controllo."}</div>
         )}
         {up.error && <div className="box bad">Ultimo controllo non riuscito: {up.error}</div>}
-        {up.checked_at > 0 && <p className="muted small-text">Ultimo controllo: {new Date(up.checked_at * 1000).toLocaleString("it-IT")}</p>}
+        {up.checked_at > 0 && <p className="muted small-text">Ultimo controllo: {new Date(up.checked_at * 1000).toLocaleString(loc())}</p>}
         {up.env_disabled && <div className="box">Il controllo è disattivato da <code>OTR_UPDATE_CHECK=off</code>: il nodo non contatta GitHub.</div>}
         <label className="check">
           <input type="checkbox" checked={upd.check} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, check: e.target.checked }), "Salvato.")} />
