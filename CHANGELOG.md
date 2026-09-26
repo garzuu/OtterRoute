@@ -5,6 +5,7 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e i
 ## [Non rilasciato]
 
 ### Aggiunto
+- **HTTPS automatico**: certificati gratuiti per i domini verificati (ACME, sfida HTTP-01) con rinnovo 30 giorni prima della scadenza, listener TLS con scelta per nome (SNI), redirect HTTP → HTTPS per dominio, caricamento di certificati propri, stato nella tabella Domini e avvisi/notifiche. Nuove opzioni `OTR_HTTPS_LISTEN`, `OTR_ACME_DIRECTORY`, `OTR_ACME_CA_ROOT`.
 - **Link firmati** con scadenza (`?exp=&sig=`, HMAC-SHA256 con la chiave del nodo): per instradamento, verificati prima della cache, con creazione dal pannello, rotazione della chiave e passo dedicato nella Diagnosi.
 
 ## [0.1.0]
@@ -20,7 +21,7 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e i
 - Immagine Docker e binari per Linux e macOS.
 
 ### Limiti noti
-- Nessun HTTPS integrato: serve un proxy davanti (vedi la guida).
+- I certificati automatici usano solo la sfida HTTP-01 (niente jolly) e richiedono la porta 80 raggiungibile da Internet.
 - Le schede dei provider si basano sulla documentazione ufficiale e non sono state provate con account reali.
 
 [Non rilasciato]: https://github.com/garzuu/OtterRoute/compare/v0.1.0...HEAD
