@@ -1,6 +1,7 @@
 mod acme;
 mod admin;
 mod admin_users;
+mod allow;
 mod audit;
 mod auth;
 mod body;
@@ -261,6 +262,7 @@ async fn main() -> anyhow::Result<()> {
             .clone()
             .filter(|h| tls_state.store.has(h)),
     );
+    gate.set_allow(panel_now.settings.admin_allow.clone());
     // prima di creare l'Updater: legge lo stato dal file, che qui si aggiorna
     if let Some(from) = update::note_startup(&args.state_dir, update::CURRENT, update::now_pub()) {
         tracing::info!(da = %from, a = update::CURRENT, "versione aggiornata");
@@ -365,7 +367,7 @@ async fn main() -> anyhow::Result<()> {
                     tokio::spawn(tls::serve(l, acceptor, move |req| {
                         let (st, gate, adm) = (st.clone(), gate.clone(), adm.clone());
                         async move {
-                            if gate.is_admin(&req) {
+                            if gate.is_admin(&req) && gate.allows(&req) {
                                 admin::handle_secure(adm, req).await
                             } else {
                                 handler::handle(st, req, true).await

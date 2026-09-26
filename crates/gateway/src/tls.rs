@@ -301,6 +301,10 @@ pub fn acceptor(store: Arc<CertStore>) -> Result<TlsAcceptor, rustls::Error> {
 
 /// Come `serve` di main, ma con TLS: un handshake che non arriva in 10 secondi
 /// o senza certificato per il nome richiesto si chiude senza toccare gli altri.
+/// L'indirizzo del client, messo tra le estensioni di ogni richiesta HTTPS.
+#[derive(Clone, Copy)]
+pub struct Peer(pub std::net::IpAddr);
+
 pub async fn serve<F, Fut>(listener: TcpListener, acceptor: TlsAcceptor, f: F)
 where
     F: Fn(http::Request<hyper::body::Incoming>) -> Fut + Clone + Send + 'static,
@@ -309,7 +313,7 @@ where
         + 'static,
 {
     loop {
-        let (stream, _) = match listener.accept().await {
+        let (stream, peer) = match listener.accept().await {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!(error = %e, "accept https");
@@ -328,7 +332,10 @@ where
                 }
                 Err(_) => return,
             };
-            let svc = service_fn(f);
+            let svc = service_fn(move |mut req: http::Request<hyper::body::Incoming>| {
+                req.extensions_mut().insert(Peer(peer.ip()));
+                f(req)
+            });
             if let Err(e) = auto::Builder::new(TokioExecutor::new())
                 .serve_connection(TokioIo::new(tls), svc)
                 .await

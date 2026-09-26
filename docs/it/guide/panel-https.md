@@ -33,6 +33,20 @@ Per disattivarlo: `-d '{"host":null}'` oppure *Disattiva* in Impostazioni.
 - La porta locale `127.0.0.1:9090` continua a funzionare, indipendentemente da questa impostazione: se il certificato scade o qualcosa si rompe, non resti fuori.
 - Non puoi eliminare il dominio né aggiungergli instradamenti finché il pannello è attivo su di esso.
 
+## Limitare gli indirizzi
+
+Puoi ammettere **solo certi indirizzi**: in *Impostazioni → Pannello in HTTPS* compare *Indirizzi ammessi*, un IP o una rete CIDR per riga (`203.0.113.7`, `10.0.0.0/8`, `2001:db8::/32`). Con l'elenco vuoto il pannello è aperto a tutti (con login).
+
+- Chi non è nell'elenco riceve **404**, come se il dominio non avesse il pannello.
+- La porta locale `127.0.0.1:9090` resta sempre aperta: se sbagli l'elenco, correggilo da lì (o con il tunnel SSH).
+- Da HTTPS non puoi salvare un elenco che non comprende il tuo indirizzo.
+- Il nodo guarda l'indirizzo della connessione, non gli header `X-Forwarded-For`: dietro Cloudflare vedrebbe gli IP di Cloudflare. In quel caso limita gli accessi con le regole di Cloudflare (Access, WAF).
+
+```sh
+curl -s -b /tmp/otr.jar -H 'Content-Type: application/json' -X PUT \
+  http://127.0.0.1:9090/api/admin-allow -d '{"list":["203.0.113.0/24"]}'
+```
+
 ## Dietro Cloudflare
 
 Con la nuvola arancione, imposta SSL/TLS su **Full** (o Full strict con un certificato di origine). In **Flexible** Cloudflare parla al nodo in HTTP e il pannello reindirizzerebbe all'infinito. Il nodo non usa gli header `X-Forwarded-*`.

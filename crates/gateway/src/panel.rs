@@ -40,6 +40,9 @@ pub struct Settings {
     /// dominio su cui il pannello si serve anche in HTTPS (oltre alla porta locale)
     #[serde(default)]
     pub admin_host: Option<String>,
+    /// IP o reti CIDR ammessi al pannello in HTTPS (vuoto = tutti)
+    #[serde(default)]
+    pub admin_allow: Vec<String>,
     /// controllo delle nuove versioni
     #[serde(default)]
     pub updates: UpdateSettings,

@@ -196,7 +196,7 @@ export interface PanelState {
   recheck_minutes: number;
   recheck_verified_minutes: number;
   panel: {
-    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings; admin_host: string | null; updates: { check: boolean; prerelease: boolean; auto: boolean; window_start: number; window_end: number } };
+    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings; admin_host: string | null; admin_allow: string[]; updates: { check: boolean; prerelease: boolean; auto: boolean; window_start: number; window_end: number } };
     domains: DomainInfo[];
     buckets: BucketInfo[];
     rules: RuleInfo[];
@@ -384,6 +384,7 @@ export const api = {
 
   addRule: (r: { domain: string; path_prefix: string; bucket_id: string; folder: string }) =>
     post<RuleInfo>("/api/rules", r),
+  setAdminAllow: (list: string[]) => request<{ list: string[] }>("/api/admin-allow", "PUT", { list }),
   setAdminHost: (host: string | null) =>
     request<{ host: string | null; url: string | null; warnings: string[] }>("/api/admin-host", "PUT", { host }),
   saveUpdates: (b: { check: boolean; prerelease: boolean; auto?: boolean; window_start?: number; window_end?: number }) => request<UpdateInfo>("/api/updates", "PUT", b),
