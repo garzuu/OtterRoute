@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test end-to-end del prototipo contro un gateway in esecuzione.
 #   GW=http://localhost CONFIG=examples/config.yaml ./scripts/e2e.sh
-# Richiede i dati di scripts/seed.sh (o equivalenti).
+# Richiede i bucket e i file di prova che crea scripts/local-e2e.sh.
 set -uo pipefail
 GW="${GW:-http://localhost}"
 CONFIG="${CONFIG:-examples/config.yaml}"
