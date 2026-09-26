@@ -1,5 +1,8 @@
 ## [Non rilasciato]
 
+### Aggiunto
+- **Metriche Prometheus** per immagini al volo, link firmati, certificati (scadenza e stato di servizio), emissioni ACME, controlli e aggiornamenti, più `otterroute_build_info`. Query e allarmi di esempio nella guida.
+
 ## [0.1.1] - 2026-09-26
 
 ### Aggiunto

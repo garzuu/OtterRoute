@@ -192,6 +192,14 @@ check "…e la variante è davvero ridimensionata" "100 75" "$(imgb "http://$GW$
 api -X PUT "$ADMIN/api/rules/$rid" -d '{"signed":false,"images":false}' >/dev/null
 check "disattivate: i parametri tornano ignorati" "$orig" "$(imgb "http://$GW/pic.png?w=100" | wc -c | tr -d ' ')"
 
+echo "== metriche di immagini e link firmati"
+mx() { curl -s "http://$ADMIN/metrics"; }
+mval() { mx | awk -v n="$1" '$1==n {print $2; exit}'; }
+check "trasformazioni riuscite contate" True "$(python3 -c "print(float('$(mval 'otterroute_image_transforms_total{result="ok"}')') >= 5)")"
+check "trasformazioni: durata totale positiva" True "$(python3 -c "print(float('$(mval otterroute_image_transform_seconds_sum)') > 0)")"
+check "immagini: rifiuti 422 contati come errore" True "$(python3 -c "print(float('$(mval 'otterroute_image_transforms_total{result="error"}')') >= 1)")"
+check "link firmati rifiutati contati" True "$(python3 -c "print(float('$(mval otterroute_signed_links_denied_total)') >= 3)")"
+
 echo "== HTTPS"
 dgx() { local b; b="$(python3 -c 'import json,sys; print(json.dumps({"url": sys.argv[1]}))' "$1")"; api $ADMIN/api/diagnose -d "$b"; }
 cat > "$work/ssl.cnf" <<'CNF'
@@ -293,6 +301,17 @@ check "controllo spento: il pannello lo dice" False "$(api $ADMIN/api/panel | jg
 h1="$(gh_hits)"
 check "…«Controlla ora» resta possibile (lo chiede l'utente)" 9.9.9 "$(api -X POST $ADMIN/api/update/check -d '{}' | jget "d['update']['latest']['version'] if 'update' in d else d['latest']['version']")"
 api -X PUT $ADMIN/api/updates -d '{"check":true,"prerelease":false}' >/dev/null
+
+echo "== metriche nuove"
+mx() { curl -s "http://$ADMIN/metrics"; }
+mval() { mx | awk -v n="$1" '$1==n {print $2; exit}'; }
+check "build_info: versione e tipo di installazione" 1 "$(mx | grep -c '^otterroute_build_info{version="[0-9.]*",install="source"} 1')"
+check "ogni serie nuova ha HELP e TYPE" True "$(mx | python3 -c "import sys; t=sys.stdin.read(); print(t.count('# HELP')==t.count('# TYPE'))")"
+check "certificato di img.localhost: scadenza esposta" 1 "$(mx | grep -c '^otterroute_certificate_not_after_timestamp_seconds{host="img.localhost"} [0-9]*$')"
+check "…e servito (1)" 1 "$(mx | grep -c '^otterroute_certificate_serving{host="img.localhost"} 1$')"
+check "controllo versione: eseguito e disponibile" 1 "$(mx | grep -c '^otterroute_update_available 1$')"
+check "controlli riusciti contati" True "$(python3 -c "print(float('$(mval 'otterroute_update_checks_total{result="ok"}')') >= 1)")"
+check "ultimo controllo valorizzato" True "$(python3 -c "print(float('$(mval otterroute_update_last_check_timestamp_seconds)') > 1e9)")"
 
 echo "== permessi"
 api $ADMIN/api/users -d '{"username":"lettore","role":"viewer","password":"password-lettore-1"}' >/dev/null

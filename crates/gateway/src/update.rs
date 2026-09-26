@@ -415,6 +415,11 @@ impl Updater {
         }
         save(&self.dir, &s);
         let err = s.error.clone();
+        crate::metrics_extra::inc(if err.is_some() {
+            &crate::metrics_extra::C.update_check_error
+        } else {
+            &crate::metrics_extra::C.update_check_ok
+        });
         *self.cached.lock().unwrap() = s;
         err.map_or(Ok(()), Err)
     }
@@ -525,6 +530,7 @@ pub fn in_window(hour: u8, start: u8, end: u8) -> bool {
 }
 
 pub fn record_rollback(dir: &Path, to: &str, reason: &str) {
+    crate::metrics_extra::inc(&crate::metrics_extra::C.update_rollback);
     let mut s = load(dir);
     s.rollback = Some(Rollback {
         to: to.to_owned(),

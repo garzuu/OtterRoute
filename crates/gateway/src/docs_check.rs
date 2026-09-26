@@ -127,7 +127,7 @@ fn scopes_reference_matches_code() {
 
 #[test]
 fn metrics_reference_matches_code() {
-    let src = include_str!("metrics.rs");
+    let src = concat!(include_str!("metrics.rs"), include_str!("metrics_extra.rs"));
     let in_code = tokens(src, "otterroute_");
     for (name, md) in read("reference/metrics.md") {
         for m in tokens(&md, "otterroute_") {
