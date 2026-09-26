@@ -1,6 +1,6 @@
 # Risoluzione dei problemi
 
-Cerca il messaggio che vedi nel pannello o nella risposta.
+Cerca il messaggio che vedi nel pannello o nella risposta. Se non lo trovi, la pagina [Diagnosi](./diagnosis) segue il percorso di un file e dice dove si ferma.
 
 ## Domini
 

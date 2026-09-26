@@ -39,12 +39,22 @@ To change these values, edit the configuration by hand (see [config.yaml](/en/re
 - **HTTP headers.** `ETag`, `If-None-Match`, `If-Modified-Since`, `Range`, `If-Range` are handled; the storage's `x-amz-*` headers never reach the visitor.
 - **Errors.** A storage `403 AccessDenied` for a missing file becomes `404`; wrong credentials give `502` and are **never** cached.
 
-## Emptying a destination's cache
+## Emptying and warming from the panel
 
-Increasing a destination's `cache_generation` in the configuration changes the cache keys: old copies become unreachable and are removed by the LRU. Nothing is deleted from disk.
+From **Routes**, expand a route's row: in the **Cache** section you find three actions (the `routes:write` scope is required).
+
+| Action | What it does |
+|---|---|
+| **Purge file** | Deletes the copy of a single file (type its name, e.g. `boat.jpg`): the next request reads it again from the storage. It tells you whether the file was in cache. |
+| **Purge all** | Empties the route's cache with one click and a confirmation. Nothing is deleted from disk: it increases the route's `cache_generation`, so old copies become unreachable and the LRU removes them. |
+| **Warm** | List up to 200 files, one per line: the node requests them by itself, one at a time, so the first visit is already a `HIT`. For each file you see status, `X-Cache`, bytes and time. Warming stops after 2 minutes; remaining files are reported as not run. |
+
+Purging does not delete the file from the storage nor from any caches in front of the node (CDN, browser): those have their own timing.
+
+In a hand-written configuration the same effect is obtained by increasing a destination's `cache_generation`.
 
 ## Known limits
 
 - `HEAD` and `Range` without a cached copy go to the storage without filling it: the first access to a "chunked" video does not cache it.
 - There is no automatic `index.html` for folders.
-- The panel does not yet have a button to empty the cache.
+- Warming downloads each file in full: with very large files (up to `OTR_CACHE_MAX_OBJECT_BYTES`) it can take time.

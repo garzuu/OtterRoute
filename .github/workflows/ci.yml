@@ -25,6 +25,8 @@ jobs:
         run: cargo test --workspace
       - name: end-to-end con finti S3
         run: ./scripts/local-e2e.sh
+      - name: azioni del pannello sulla cache (svuota, precarica)
+        run: ./scripts/panel-e2e.sh
 
   web:
     runs-on: ubuntu-latest

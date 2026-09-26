@@ -42,6 +42,7 @@ export const sections: Section[] = [
     pages: [
       { slug: "guide/users-2fa", it: "Utenti, permessi e 2FA", en: "Users, permissions and 2FA" },
       { slug: "guide/statistics", it: "Statistiche e metriche", en: "Statistics and metrics" },
+      { slug: "guide/diagnosis", it: "Diagnosi", en: "Diagnosis" },
       { slug: "guide/notifications", it: "Notifiche", en: "Notifications" },
       { slug: "guide/https-proxy", it: "HTTPS e proxy", en: "HTTPS and proxies" },
       { slug: "guide/security", it: "Sicurezza", en: "Security" },

@@ -28,6 +28,10 @@ const ACTION_LABEL: Record<string, string> = {
   "bucket.delete": "Bucket eliminato",
   "rule.add": "Instradamento creato",
   "rule.delete": "Instradamento eliminato",
+  "cache.purge": "Cache svuotata",
+  "cache.warm": "Cache precaricata",
+  "notifications.update": "Notifiche modificate",
+  "notifications.test": "Prova di notifica",
   "settings.update": "Impostazioni modificate",
 };
 

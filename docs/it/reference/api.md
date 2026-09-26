@@ -28,6 +28,8 @@ Autenticazione: cookie di sessione ottenuto con `POST /api/login`. Le richieste 
 | `DELETE /api/buckets/{id}` | `buckets:write` |
 | `POST /api/rules`, `DELETE /api/rules/{id}` | `routes:write` |
 | `POST /api/probe` | `routes:read` |
+| `POST /api/purge`, `POST /api/warm` | `routes:write` |
+| `POST /api/diagnose` | `routes:read` |
 | `/api/users`, `/api/audit`, `/api/policy` | `users:manage` |
 | `GET/PUT /api/notifications`, `POST /api/notifications/test` | `notifications:manage` |
 | `/api/me`, `/api/me/password`, `/api/me/2fa/…` | — |

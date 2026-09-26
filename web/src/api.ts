@@ -109,6 +109,15 @@ export interface BucketInfo {
   check: BucketCheck | null;
 }
 
+export interface WarmResult {
+  path: string;
+  status: number | null;
+  x_cache?: string | null;
+  bytes?: number;
+  elapsed_ms?: number;
+  error: string | null;
+}
+
 export interface RuleInfo {
   id: string;
   domain: string;
@@ -260,7 +269,22 @@ export interface NotifyInfo {
   log: NotifyLogEntry[];
 }
 
+export interface DiagStep {
+  id: string;
+  label: string;
+  status: "ok" | "warn" | "fail" | "skip";
+  detail: string;
+  fix?: string;
+}
+
+export interface DiagResult {
+  steps: DiagStep[];
+  summary: string;
+  report: string;
+}
+
 export const api = {
+  diagnose: (url: string) => post<DiagResult>("/api/diagnose", { url }),
   notifications: () => request<NotifyInfo>("/api/notifications"),
   saveNotifications: (b: { config: NotifyConfig; smtp_password?: string; telegram_token?: string }) =>
     request<NotifyInfo>("/api/notifications", "PUT", b),
@@ -312,6 +336,8 @@ export const api = {
 
   addRule: (r: { domain: string; path_prefix: string; bucket_id: string; folder: string }) =>
     post<RuleInfo>("/api/rules", r),
+  purgeCache: (rule: string, path?: string) => post<{ all?: boolean; removed?: number }>("/api/purge", { rule, path }),
+  warmCache: (rule: string, paths: string[]) => post<{ results: WarmResult[] }>("/api/warm", { rule, paths }),
   deleteRule: (id: string) => del(`/api/rules/${encodeURIComponent(id)}`),
 
   probe: (host: string, path: string) => post<ProbeResult>("/api/probe", { host, path }),

@@ -5,6 +5,7 @@ mod auth;
 mod body;
 mod cache;
 mod config;
+mod diag;
 mod dns;
 #[cfg(test)]
 mod docs_check;

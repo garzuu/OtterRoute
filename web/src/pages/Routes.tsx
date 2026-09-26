@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { api, domainStatus, type PanelState, type ProbeResult, type RuleInfo } from "../api";
+import { api, domainStatus, type PanelState, type ProbeResult, type RuleInfo, type WarmResult } from "../api";
 import { useAuth } from "../auth";
 import { DataTable, type Column } from "../DataTable";
 import type { PageId } from "../Dashboard";
 import { DeleteButton, EmptyState, Field, Modal, Page } from "../ui";
 import { DOMAIN_BADGE } from "./Domains";
+import { setDiagnosisTarget } from "../diagnosisTarget";
 
 const cleanFolder = (p: string) => p.split("/").filter(Boolean).join("/");
 const routePrefix = (p: string) => {
@@ -106,7 +107,12 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
               }}
             />
           )}
-          expand={(x) => <ProbePanel r={x} port={state.http_port} />}
+          expand={(x) => (
+            <>
+              <ProbePanel r={x} port={state.http_port} onDiagnose={(u) => { setDiagnosisTarget(u); go("diagnosis"); }} />
+              {canWrite && <CachePanel r={x} />}
+            </>
+          )}
         />
       </div>
 
@@ -250,7 +256,126 @@ function NewRule(props: { state: PanelState; go: (p: PageId) => void; onClose: (
   );
 }
 
-function ProbePanel(props: { r: RuleInfo; port: number }) {
+/** Svuotamento e precaricamento della cache di un instradamento. */
+function CachePanel(props: { r: RuleInfo }) {
+  const { r } = props;
+  const [file, setFile] = useState("");
+  const [list, setList] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [warm, setWarm] = useState<WarmResult[]>([]);
+  const [armed, setArmed] = useState(false);
+  const full = (f: string) => `${r.path_prefix}${f.trim().replace(/^\//, "")}`;
+
+  const run = async (what: string, fn: () => Promise<void>) => {
+    setBusy(what);
+    setMsg(null);
+    try {
+      await fn();
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const files = list
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="details">
+      <strong>Cache</strong>
+      <div className="inline tight">
+        <input value={file} onChange={(e) => setFile(e.target.value)} placeholder="file da svuotare, es. barca.jpg" aria-label="File da svuotare" spellCheck={false} />
+        <button
+          className="secondary small"
+          disabled={busy !== null || !file.trim()}
+          onClick={() =>
+            run("file", async () => {
+              const res = await api.purgeCache(r.id, full(file));
+              setMsg({ ok: true, text: res.removed ? "Copia rimossa: la prossima richiesta la rilegge dallo storage." : "Quel file non era in cache." });
+            })
+          }
+        >
+          Svuota file
+        </button>
+        {armed ? (
+          <>
+            <button
+              className="danger small"
+              disabled={busy !== null}
+              onClick={() =>
+                run("all", async () => {
+                  await api.purgeCache(r.id);
+                  setArmed(false);
+                  setMsg({ ok: true, text: "Cache dell’instradamento svuotata." });
+                })
+              }
+            >
+              Conferma
+            </button>
+            <button className="ghost small" onClick={() => setArmed(false)}>
+              Annulla
+            </button>
+          </>
+        ) : (
+          <button className="secondary small" onClick={() => setArmed(true)} disabled={busy !== null}>
+            Svuota tutto
+          </button>
+        )}
+      </div>
+      <textarea rows={3} value={list} onChange={(e) => setList(e.target.value)} placeholder={"file da precaricare, uno per riga (max 200)\nbarca.jpg\nfoto/mare.jpg"} spellCheck={false} aria-label="File da precaricare" />
+      <div className="inline tight">
+        <button
+          className="secondary small"
+          disabled={busy !== null || files.length === 0 || files.length > 200}
+          onClick={() =>
+            run("warm", async () => {
+              const res = await api.warmCache(r.id, files.map(full));
+              setWarm(res.results);
+              const bad = res.results.filter((x) => x.error || (x.status ?? 500) >= 400).length;
+              setMsg({ ok: bad === 0, text: bad === 0 ? `${res.results.length} file precaricati.` : `${bad} su ${res.results.length} con problemi.` });
+            })
+          }
+        >
+          {busy === "warm" ? "Precarico…" : "Precarica"}
+        </button>
+        <span className="muted small-text">Il nodo richiede i file uno alla volta: la prima visita sarà già dalla cache.</span>
+      </div>
+      {msg && <div className={`box ${msg.ok ? "good" : "bad"}`}>{msg.text}</div>}
+      {warm.length > 0 && (
+        <table className="mini">
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Stato</th>
+              <th>Cache</th>
+              <th>Byte</th>
+              <th>Tempo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warm.map((x) => (
+              <tr key={x.path}>
+                <td>{x.path}</td>
+                <td className={x.status && x.status < 300 ? "ok" : "ko"}>{x.status ?? x.error}</td>
+                <td>
+                  <span className={`tag ${x.x_cache ?? ""}`}>{x.x_cache ?? "—"}</span>
+                </td>
+                <td>{x.bytes ?? "—"}</td>
+                <td>{x.elapsed_ms != null ? `${x.elapsed_ms} ms` : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function ProbePanel(props: { r: RuleInfo; port: number; onDiagnose: (url: string) => void }) {
   const { r } = props;
   const [file, setFile] = useState("");
   const [runs, setRuns] = useState<ProbeResult[]>([]);
@@ -286,6 +411,11 @@ function ProbePanel(props: { r: RuleInfo; port: number }) {
         <button className="secondary small" onClick={probe} disabled={busy || !file.trim()}>
           {busy ? "…" : "Prova"}
         </button>
+        {file.trim() && (
+          <button className="ghost small" onClick={() => props.onDiagnose(url)} title="Segue il percorso della richiesta e mostra dove si ferma">
+            Diagnosi
+          </button>
+        )}
         {file.trim() && (
           <a className="ghost small btn" href={url} target="_blank" rel="noreferrer">
             Apri

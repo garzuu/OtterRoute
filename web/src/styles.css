@@ -536,3 +536,12 @@ table.mini .ko { color: var(--bad); font-weight: 600; }
 .help-links a span { color: var(--muted); }
 .help-sub { padding: 10px 16px 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .card h2 + .check { margin-top: 10px; }
+
+.diag { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; }
+.diag-step { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.diag-step:last-child { border-bottom: 0; }
+.diag-mark { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.diag-mark.good { background: var(--good-bg); color: var(--good); border-color: var(--good-line); }
+.diag-mark.warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line); }
+.diag-mark.bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad-line); }
+.diag-fix { margin-top: 6px; padding: 8px 12px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--line); font-size: 13px; }
