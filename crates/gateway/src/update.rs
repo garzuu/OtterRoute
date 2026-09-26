@@ -35,15 +35,62 @@ pub fn parse_version(s: &str) -> Option<(u64, u64, u64, bool)> {
     it.next().is_none().then_some((a, b, c, pre))
 }
 
-/// `latest` è più recente di `current`? Una pre-release conta meno della stessa versione finale.
-pub fn is_newer(latest: &str, current: &str) -> bool {
-    match (parse_version(latest), parse_version(current)) {
-        (Some(l), Some(c)) => {
-            let key = |v: (u64, u64, u64, bool)| (v.0, v.1, v.2, !v.3);
-            key(l) > key(c)
-        }
-        _ => false,
+/// Ordine delle versioni secondo semver: una pre-release conta meno della stessa versione finale e
+/// le pre-release si confrontano tra loro (`rc2` > `rc1`, `rc10` > `rc2`).
+pub fn cmp_versions(a: &str, b: &str) -> Option<std::cmp::Ordering> {
+    use std::cmp::Ordering;
+    let (ca, cb) = (parse_version(a)?, parse_version(b)?);
+    let core = (ca.0, ca.1, ca.2).cmp(&(cb.0, cb.1, cb.2));
+    if core != Ordering::Equal {
+        return Some(core);
     }
+    let pre = |s: &str| -> Option<String> {
+        s.trim()
+            .trim_start_matches('v')
+            .split_once('-')
+            .map(|(_, p)| p.split('+').next().unwrap_or(p).to_owned())
+    };
+    Some(match (pre(a), pre(b)) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Greater,
+        (Some(_), None) => Ordering::Less,
+        (Some(x), Some(y)) => cmp_pre(&x, &y),
+    })
+}
+
+/// Identificatori separati da punti; numeri per valore, il resto per testo e numero finale (`rc10` > `rc2`).
+fn cmp_pre(x: &str, y: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let split = |id: &str| -> (String, u64) {
+        let digits = id.chars().rev().take_while(char::is_ascii_digit).count();
+        let (t, n) = id.split_at(id.len() - digits);
+        (t.to_owned(), n.parse().unwrap_or(0))
+    };
+    let (mut xi, mut yi) = (x.split('.'), y.split('.'));
+    loop {
+        match (xi.next(), yi.next()) {
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(p), Some(q)) => {
+                let (pn, qn) = (p.parse::<u64>(), q.parse::<u64>());
+                let o = match (pn, qn) {
+                    (Ok(a), Ok(b)) => a.cmp(&b),
+                    (Ok(_), Err(_)) => Ordering::Less,
+                    (Err(_), Ok(_)) => Ordering::Greater,
+                    (Err(_), Err(_)) => split(p).cmp(&split(q)),
+                };
+                if o != Ordering::Equal {
+                    return o;
+                }
+            }
+        }
+    }
+}
+
+/// `latest` è più recente di `current`?
+pub fn is_newer(latest: &str, current: &str) -> bool {
+    cmp_versions(latest, current) == Some(std::cmp::Ordering::Greater)
 }
 
 // --- tipo di installazione ---------------------------------------------------------
@@ -224,7 +271,7 @@ fn short_notes(body: &str) -> String {
 fn pick_ref(list: &[GhRelease], with_pre: bool) -> Option<Release> {
     list.iter()
         .filter(|r| !r.draft && (with_pre || !r.prerelease) && parse_version(&r.tag_name).is_some())
-        .max_by_key(|r| parse_version(&r.tag_name).map(|v| (v.0, v.1, v.2, !v.3)))
+        .max_by(|a, b| cmp_versions(&a.tag_name, &b.tag_name).unwrap_or(std::cmp::Ordering::Equal))
         .map(|r| Release {
             version: r.tag_name.trim_start_matches('v').to_owned(),
             assets: r
@@ -798,6 +845,14 @@ mod tests {
         assert_eq!(parse_version("1.2"), None);
         assert_eq!(parse_version("1.2.3.4"), None);
         assert_eq!(parse_version("x.y.z"), None);
+        // ordine delle pre-release
+        assert!(is_newer("0.1.2-rc2", "0.1.2-rc1"));
+        assert!(is_newer("0.1.2-rc10", "0.1.2-rc2"));
+        assert!(is_newer("0.1.2", "0.1.2-rc9"));
+        assert!(!is_newer("0.1.2-rc1", "0.1.2"));
+        assert!(!is_newer("0.1.2-rc1", "0.1.2-rc1"));
+        assert!(is_newer("0.1.2-rc1", "0.1.1"));
+        assert!(is_newer("0.1.2-beta1", "0.1.2-alpha9"));
         assert!(
             is_newer("0.1.1", "0.1.0")
                 && is_newer("0.2.0", "0.1.9")
@@ -916,6 +971,22 @@ mod tests {
         assert_eq!(pick(list(), true).unwrap().version, "0.2.0-rc1");
         assert!(pick(vec![gh("nightly", false, false)], true).is_none());
         assert_eq!(pick(list(), false).unwrap().notes, "note v0.1.1");
+    }
+
+    #[test]
+    fn newest_prerelease_wins_regardless_of_list_order() {
+        // GitHub elenca dalla più recente: rc2 viene prima di rc1
+        let list = || {
+            vec![
+                gh("v0.1.2-rc2", true, false),
+                gh("v0.1.2-rc1", true, false),
+                gh("v0.1.1", false, false),
+            ]
+        };
+        assert_eq!(pick(list(), true).unwrap().version, "0.1.2-rc2");
+        let mut rev = list();
+        rev.reverse();
+        assert_eq!(pick(rev, true).unwrap().version, "0.1.2-rc2");
     }
 
     #[test]
