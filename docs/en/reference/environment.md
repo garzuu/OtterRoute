@@ -14,7 +14,8 @@ Every option can be given as a flag (`--cache-dir`) or as an environment variabl
 | `OTR_ACME_CA_ROOT` | `--acme-ca-root` | — | PEM file with the root CA of the alternative directory. |
 | `OTR_UPDATE_CHECK` | `--update-check` | `on` | `off` turns off every request to GitHub looking for new versions. |
 | `OTR_UPDATE_API` | `--update-api` | GitHub (official releases) | Releases API for forks or internal mirrors. |
-| `OTR_INSTALL` | `--install` | — | How the node is installed (`docker` in the official image): decides the update instructions. |
+| `OTR_UPDATE_KEY` | `--update-key` | official key | Ed25519 public key (hex, 32 bytes) used to verify releases: only for forks or internal mirrors that sign with their own key. |
+| `OTR_INSTALL` | `--install` | — | How the node is installed: `docker` (in the official image), `service`, `binary` or `source`. Decides the update instructions and whether the node can update itself (`service` and `binary`). |
 | `OTR_ADMIN_LISTEN` | `--admin-listen` | `127.0.0.1:9090` | Panel, API, `/healthz` and `/metrics`. Keep it local. |
 | `OTR_CACHE_DIR` | `--cache-dir` | `./data/cache` | Disk cache folder. |
 | `OTR_CACHE_MAX_BYTES` | `--cache-max-bytes` | `10737418240` (10 GiB) | Maximum cache size. |
@@ -28,6 +29,10 @@ Every option can be given as a flag (`--cache-dir`) or as an environment variabl
 | `OTR_DOCS_URL` | `--docs-url` | `https://garzuu.github.io/OtterRoute/` | Address of the online guide used by the panel's “Guide” links. Empty = no links. The offline copy takes precedence if present. |
 | `OTR_RELOAD_INTERVAL` | `--reload-interval` | `2s` | How often to re-read the configuration file. |
 | — | `--reset-user NAME` | — | Resets the user's password and 2FA and exits. |
+| — | `--check-update` | — | Looks for a new version, shows it and exits. |
+| — | `--self-update` | — | Downloads, verifies and installs the new version (executable, panel, guide) and exits; restarting is up to you. Only for `binary` and `service` installations. |
+| — | `--self-check` | — | Startup test with temporary state and ports: prints `ok` and exits 0 if the node answers `/healthz`. |
+| — | `--healthcheck` | — | Checks `/healthz` on the local panel and exits (0 = ok): it is the Docker image's `HEALTHCHECK`. |
 
 Durations are written as `30s`, `5m`, `1h`, `24h`, `7d`.
 

@@ -158,7 +158,7 @@ pub fn access(method: &Method, path: &str) -> Option<Access> {
         ("PUT", "/api/settings" | "/api/https" | "/api/admin-host" | "/api/updates") => {
             Scope("settings:write")
         }
-        ("POST", "/api/update/check") => Scope("settings:write"),
+        ("POST", "/api/update/check" | "/api/update/apply") => Scope("settings:write"),
         (
             "POST",
             "/api/domains"
@@ -261,6 +261,7 @@ async fn api(
         (&Method::PUT, "/api/https") => with_body!(HttpsReq, save_https),
         (&Method::PUT, "/api/updates") => with_body!(UpdatesReq, save_updates),
         (&Method::POST, "/api/update/check") => update_check(admin, pr).await,
+        (&Method::POST, "/api/update/apply") => update_apply(admin),
         (&Method::PUT, "/api/admin-host") => with_body!(AdminHostReq, set_admin_host),
         (&Method::POST, "/api/certs/issue") => with_body!(HostReq, issue_cert),
         (&Method::POST, "/api/certs/upload") => with_body!(UploadCertReq, upload_cert),
@@ -566,7 +567,7 @@ fn status(admin: &Admin) -> Response<Body> {
     json(
         StatusCode::OK,
         json!({
-            "version": env!("CARGO_PKG_VERSION"),
+            "version": crate::update::CURRENT,
             "config_version": state.snapshot.load().version,
             "routes": routes_json(state),
             "cache": state.cache.stats(),
@@ -659,7 +660,7 @@ fn panel_state(admin: &Admin, pr: &Principal) -> Response<Body> {
         Err(e) => return error(StatusCode::INTERNAL_SERVER_ERROR, e),
     };
     let mut v = json!({
-        "version": env!("CARGO_PKG_VERSION"),
+        "version": crate::update::CURRENT,
         "config_version": state.snapshot.load().version,
         "listen_port": admin.listen_port,
         "http_port": panel.settings.http(),
@@ -1095,6 +1096,12 @@ struct UpdatesReq {
     check: bool,
     #[serde(default)]
     prerelease: bool,
+    #[serde(default)]
+    auto: bool,
+    #[serde(default)]
+    window_start: Option<u8>,
+    #[serde(default)]
+    window_end: Option<u8>,
 }
 
 async fn save_updates(admin: &Admin, req: UpdatesReq) -> Response<Body> {
@@ -1103,9 +1110,16 @@ async fn save_updates(admin: &Admin, req: UpdatesReq) -> Response<Body> {
         Ok(p) => p,
         Err(r) => return r,
     };
+    if req.window_start.is_some_and(|h| h > 23) || req.window_end.is_some_and(|h| h > 23) {
+        return bad("l'ora deve essere tra 0 e 23");
+    }
+    let old = p.settings.updates.clone();
     p.settings.updates = panel::UpdateSettings {
         check: req.check,
         prerelease: req.prerelease,
+        auto: req.auto,
+        window_start: req.window_start.unwrap_or(old.window_start),
+        window_end: req.window_end.unwrap_or(old.window_end),
     };
     if let Err(r) = save_panel(admin, &p) {
         return r;
@@ -1149,6 +1163,31 @@ async fn update_check(admin: &Admin, _pr: &Principal) -> Response<Body> {
             .updater
             .view(p.settings.updates.check, p.settings.updates.prerelease),
     )
+}
+
+/// «Aggiorna ora»: avvia l'aggiornamento in background; il pannello ne segue i passi da `update.apply`.
+/// Se riesce, il nodo si riavvia (la connessione cade): il pannello si ricarica da solo.
+fn update_apply(admin: &Admin) -> Response<Body> {
+    let (ok, why) = admin.updater.self_update_status();
+    if !ok {
+        return bad(why.unwrap_or_else(|| "aggiornamento automatico non disponibile".into()));
+    }
+    if admin.updater.progress().running {
+        return error(StatusCode::CONFLICT, "un aggiornamento è già in corso");
+    }
+    if admin.acme.any_issuing() {
+        return error(
+            StatusCode::CONFLICT,
+            "è in corso l'emissione di un certificato: riprova tra poco",
+        );
+    }
+    let prerelease = load_panel(admin).is_ok_and(|p| p.settings.updates.prerelease);
+    let u = admin.updater.clone();
+    tokio::spawn(async move {
+        let Err(e) = u.apply(prerelease).await;
+        tracing::warn!(error = %e, "aggiornamento non riuscito");
+    });
+    json(StatusCode::ACCEPTED, json!({ "started": true }))
 }
 
 // --- pannello in HTTPS --------------------------------------------------------

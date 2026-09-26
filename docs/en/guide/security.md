@@ -41,6 +41,10 @@ OtterRoute serves **read-only** files from private buckets. Whoever visits has n
 
 2FA secrets are stored in clear in the file, like bucket keys: protect the folder with system permissions and disk encryption.
 
+## Signed updates
+
+Releases are signed with **Ed25519**: the public key is embedded in the binary, the private one is in the repository's secrets and never leaves CI. [Automatic update](./upgrades-backup) downloads only from GitHub and **refuses** a package without a valid signature, with a different checksum or with dangerous paths; `scripts/install.sh` does the same. The version check (one request a day) sends no node data and is turned off with `OTR_UPDATE_CHECK=off`.
+
 ## Limits to know
 
 - Sessions live in memory: a restart disconnects everyone.

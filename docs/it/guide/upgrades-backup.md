@@ -38,7 +38,7 @@ Il backup contiene chiavi e hash: conservalo cifrato e con permessi ristretti.
 
 ## Aggiornare
 
-OtterRoute **non si aggiorna da solo**: il pannello ti avvisa quando c'è una versione nuova e ti mostra i passi per il tuo tipo di installazione; l'aggiornamento lo fai tu.
+Il pannello ti avvisa quando c'è una versione nuova e ti mostra i passi per il tuo tipo di installazione. Con un'installazione **a binario o a servizio** il nodo può anche **aggiornarsi da solo** (vedi sotto); con **Docker** l'immagine si sostituisce da fuori.
 
 ### Sapere se c'è una versione nuova
 
@@ -60,7 +60,32 @@ docker stop otterroute && docker rm otterroute
 # rilancia lo STESSO comando "docker run" di prima (stesse porte, stesso volume /data)
 ```
 
-### Binario o servizio (systemd, launchd)
+### Aggiornamento automatico (binario e servizio)
+
+Se il nodo gira da un eseguibile scaricato dalla release (non da Docker né dai sorgenti) e l'utente del servizio può **scrivere nella cartella dell'eseguibile**, in **Impostazioni → Aggiornamenti** compare **Aggiorna ora**. Da terminale: `otterroute --self-update` (poi riavvia il servizio) e `otterroute --check-update` per sapere solo se c'è una versione nuova.
+
+Cosa fa, nell'ordine (se un passo fallisce l'installazione resta com'era):
+
+1. **Scarica** il pacchetto della tua piattaforma, solo da GitHub, con un limite di 100 MiB.
+2. **Verifica** lo **SHA-256** e la **firma Ed25519**. La chiave pubblica è dentro il binario; la privata sta nei segreti del repository e firma ogni release. Un pacchetto senza firma valida **si rifiuta**: l'aggiornamento manuale resta sempre possibile.
+3. **Estrae** solo l'eseguibile, `ui/` e `docs/` (niente percorsi con `..`, niente collegamenti simbolici) e **prova** il nuovo eseguibile: dichiara la versione attesa e, avviato con stato e porte temporanei (`--self-check`), risponde a `/healthz`.
+4. **Salva un backup** dello stato (utenti, configurazione, chiavi, certificati) in `state/backups/<versione>/`, tenendo gli ultimi 3.
+5. **Sostituisce** l'eseguibile, il pannello e la guida, conservando i vecchi come `otterroute.prev`, `ui.prev`, `docs.prev`.
+6. **Riavvia** se stesso con lo stesso PID e gli stessi argomenti: un servizio non vede alcun riavvio. Le sessioni di accesso si perdono.
+
+**Se la versione nuova non parte bene**: dopo l'aggiornamento il nodo conta gli avvii; se per **3 avvii di fila non arriva la conferma** (60 secondi di funzionamento regolare) ripristina da solo i file precedenti e riparte con la versione vecchia. Il motivo compare nella campanella. Serve che qualcosa **riavvii il processo** quando si ferma (systemd con `Restart=always` o `on-failure`). Se il nuovo eseguibile si rifiuta di partire del tutto, la prova del passo 3 lo avrebbe già scoperto prima di sostituirlo.
+
+**Automatico, se vuoi** (spento di default): la casella *Applica da solo le versioni di correzione* installa le versioni della stessa serie (0.1.x) nella finestra oraria che scegli (di default 03:00–05:00, ora del nodo). Le versioni minori e maggiori restano manuali, non parte durante l'emissione di un certificato e non installa mai una pre-release.
+
+::: warning Quello che non fa
+- Un cambio di **schema dei dati** non si annulla da solo: se la versione nuova ha già migrato i dati, per tornare indietro ripristina anche il backup in `state/backups/`.
+- Non c'è aggiornamento senza interruzione: il nodo è fermo pochi secondi.
+- La firma protegge quanto il segreto che la produce: se la chiave di firma venisse compromessa servirebbe una release manuale con una chiave nuova.
+:::
+
+Il pacchetto può essere installato anche da un fork o da un mirror interno: imposta `OTR_UPDATE_API` e la chiave pubblica con cui firmi (`OTR_UPDATE_KEY`).
+
+### Binario o servizio (systemd, launchd), a mano
 
 Scarica dalla [pagina delle release](https://github.com/garzuu/OtterRoute/releases) il pacchetto per la tua piattaforma, verificane il checksum e sostituisci l'eseguibile (e le cartelle `ui/` e `docs/` accanto a lui):
 

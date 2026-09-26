@@ -53,6 +53,21 @@ pub struct UpdateSettings {
     /// propone anche le pre-release (`-rc`)
     #[serde(default)]
     pub prerelease: bool,
+    /// applica da solo le versioni di correzione (0.1.x) nella finestra oraria
+    #[serde(default)]
+    pub auto: bool,
+    /// ora locale di inizio e fine della finestra (default 3–5)
+    #[serde(default = "start_hour")]
+    pub window_start: u8,
+    #[serde(default = "end_hour")]
+    pub window_end: u8,
+}
+
+fn start_hour() -> u8 {
+    3
+}
+fn end_hour() -> u8 {
+    5
 }
 
 fn yes() -> bool {
@@ -64,6 +79,9 @@ impl Default for UpdateSettings {
         Self {
             check: true,
             prerelease: false,
+            auto: false,
+            window_start: start_hour(),
+            window_end: end_hour(),
         }
     }
 }

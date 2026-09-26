@@ -11,7 +11,8 @@ Ogni opzione si può dare come flag (`--cache-dir`) o come variabile d'ambiente.
 | `OTR_ACME_CA_ROOT` | `--acme-ca-root` | — | File PEM con la CA radice della directory alternativa. |
 | `OTR_UPDATE_CHECK` | `--update-check` | `on` | `off` spegne ogni richiesta verso GitHub per cercare nuove versioni. |
 | `OTR_UPDATE_API` | `--update-api` | GitHub (release ufficiali) | API delle release per fork o mirror interni. |
-| `OTR_INSTALL` | `--install` | — | Come è installato il nodo (`docker` nell'immagine ufficiale): decide le istruzioni di aggiornamento. |
+| `OTR_UPDATE_KEY` | `--update-key` | chiave ufficiale | Chiave pubblica Ed25519 (esadecimale, 32 byte) con cui si verificano le release: serve solo a fork o mirror interni che firmano con una chiave propria. |
+| `OTR_INSTALL` | `--install` | — | Come è installato il nodo: `docker` (nell'immagine ufficiale), `service`, `binary` o `source`. Decide le istruzioni di aggiornamento e se il nodo può aggiornarsi da solo (`service` e `binary`). |
 | `OTR_ADMIN_LISTEN` | `--admin-listen` | `127.0.0.1:9090` | Pannello, API, `/healthz` e `/metrics`. Tienilo in locale. |
 | `OTR_CACHE_DIR` | `--cache-dir` | `./data/cache` | Cartella della cache su disco. |
 | `OTR_CACHE_MAX_BYTES` | `--cache-max-bytes` | `10737418240` (10 GiB) | Dimensione massima della cache. |
@@ -25,6 +26,10 @@ Ogni opzione si può dare come flag (`--cache-dir`) o come variabile d'ambiente.
 | `OTR_DOCS_URL` | `--docs-url` | `https://garzuu.github.io/OtterRoute/` | Indirizzo della guida online usato dai link «Guida» del pannello. Vuoto = nessun link. Ha la precedenza la copia offline, se presente. |
 | `OTR_RELOAD_INTERVAL` | `--reload-interval` | `2s` | Ogni quanto rileggere il file di configurazione. |
 | — | `--reset-user NOME` | — | Reimposta password e 2FA dell'utente e termina. |
+| — | `--check-update` | — | Cerca una versione nuova, la mostra ed esce. |
+| — | `--self-update` | — | Scarica, verifica e installa la versione nuova (eseguibile, pannello, guida) ed esce; il riavvio resta a te. Solo per installazioni `binary` e `service`. |
+| — | `--self-check` | — | Prova d'avvio con stato e porte temporanei: stampa `ok` ed esce con 0 se il nodo risponde a `/healthz`. |
+| — | `--healthcheck` | — | Controlla `/healthz` sul pannello locale ed esce (0 = ok): è l'`HEALTHCHECK` dell'immagine Docker. |
 
 Le durate si scrivono come `30s`, `5m`, `1h`, `24h`, `7d`.
 

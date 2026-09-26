@@ -18,6 +18,7 @@ mod notify;
 mod panel;
 mod routing;
 mod s3;
+mod selfupdate;
 mod sign;
 mod tls;
 mod totp;
@@ -44,7 +45,7 @@ use crate::handler::AppState;
 #[derive(Parser, Debug)]
 #[command(
     name = "otterroute",
-    version,
+    version = update::CURRENT,
     about = "OtterRoute gateway: pubblica oggetti S3 su più domini"
 )]
 struct Args {
@@ -108,9 +109,31 @@ struct Args {
     /// API delle release (per fork o mirror interni; default: il repository ufficiale)
     #[arg(long, env = "OTR_UPDATE_API")]
     update_api: Option<String>,
-    /// Come è installato il nodo (`docker` nell'immagine ufficiale): decide le istruzioni di aggiornamento
+    /// Come è installato il nodo (`docker`, `service`, `binary` o `source`; `docker` nell'immagine ufficiale): decide le istruzioni di aggiornamento
     #[arg(long, env = "OTR_INSTALL")]
     install: Option<String>,
+    /// Cerca una versione nuova, la mostra ed esce
+    #[arg(long)]
+    check_update: bool,
+    /// Scarica, verifica e installa la versione nuova (eseguibile, pannello, guida) ed esce:
+    /// il riavvio del servizio resta a te
+    #[arg(long)]
+    self_update: bool,
+    /// Prova d'avvio: parte con stato e porte temporanee, controlla /healthz ed esce (0 = ok)
+    #[arg(long)]
+    self_check: bool,
+    /// Controlla /healthz sul pannello locale ed esce (0 = ok): per l'HEALTHCHECK di Docker
+    #[arg(long)]
+    healthcheck: bool,
+    /// Chiave pubblica (hex) per verificare le release: per fork o mirror interni
+    #[arg(long, env = "OTR_UPDATE_KEY")]
+    update_key: Option<String>,
+    /// Solo per le prove: secondi senza problemi prima di confermare un aggiornamento
+    #[arg(long, hide = true, default_value_t = selfupdate::CONFIRM_AFTER_SECS)]
+    confirm_after_secs: u64,
+    /// Solo per le prove: termina all'avvio se la versione in esecuzione è questa
+    #[arg(long, hide = true)]
+    crash_if_version: Option<String>,
     /// Indirizzo con cui si raggiunge il pannello, per il link nelle notifiche (facoltativo)
     #[arg(long, env = "OTR_PUBLIC_URL")]
     public_url: Option<String>,
@@ -132,9 +155,43 @@ async fn main() -> anyhow::Result<()> {
     // senza un predefinito esplicito i client TLS (ACME, SMTP, reqwest) vanno in panic
     let _ = rustls::crypto::ring::default_provider().install_default();
     let args = Args::parse();
+    if args.healthcheck {
+        std::process::exit(i32::from(!healthcheck(args.admin_listen)));
+    }
+    if args.self_check {
+        return self_check();
+    }
     std::fs::create_dir_all(&args.state_dir).context("state_dir")?;
     if let Some(name) = &args.reset_user {
         return reset_user(&args.state_dir, name);
+    }
+    if args.check_update || args.self_update {
+        return update_cli(&args).await;
+    }
+    // aggiornamento appena installato: conta gli avvii e, se non parte bene, torna indietro
+    let trial = match selfupdate::boot_guard(&args.state_dir, update::CURRENT) {
+        selfupdate::Guard::RolledBack { exe, reason } => {
+            eprintln!("aggiornamento annullato: {reason}");
+            if exe.as_os_str().is_empty() {
+                anyhow::bail!("{reason}");
+            }
+            use std::os::unix::process::CommandExt;
+            let err = std::process::Command::new(&exe)
+                .args(std::env::args_os().skip(1))
+                .exec();
+            anyhow::bail!("impossibile riavviare la versione precedente: {err}");
+        }
+        selfupdate::Guard::Trial(n) => {
+            tracing::warn!(
+                tentativo = n,
+                "primo avvio dopo un aggiornamento: in attesa di conferma"
+            );
+            true
+        }
+        selfupdate::Guard::Nothing => false,
+    };
+    if args.crash_if_version.as_deref() == Some(update::CURRENT) {
+        std::process::exit(1);
     }
     audit::init(&args.state_dir);
     let last_good = args.state_dir.join("last-good.yaml");
@@ -204,13 +261,28 @@ async fn main() -> anyhow::Result<()> {
             .clone()
             .filter(|h| tls_state.store.has(h)),
     );
-    let updater = Arc::new(update::Updater::new(
-        args.state_dir.clone(),
-        args.update_api.clone(),
-    ));
+    // prima di creare l'Updater: legge lo stato dal file, che qui si aggiorna
     if let Some(from) = update::note_startup(&args.state_dir, update::CURRENT, update::now_pub()) {
         tracing::info!(da = %from, a = update::CURRENT, "versione aggiornata");
         audit::log("update.applied", &format!("{from} → {}", update::CURRENT));
+    }
+    let updater = Arc::new(
+        update::Updater::new(args.state_dir.clone(), args.update_api.clone()).with_install(
+            Some(args.ui_dir.clone()),
+            args.docs_dir.clone(),
+            args.update_key.clone(),
+            {
+                let (m, f) = (metrics.clone(), metrics_file.clone());
+                Box::new(move || m.save(&f))
+            },
+        ),
+    );
+    if trial {
+        tokio::spawn(update::confirm_after(
+            args.state_dir.clone(),
+            update::CURRENT.to_owned(),
+            args.confirm_after_secs,
+        ));
     }
     let admin_ctx = Arc::new(admin::Admin {
         state: state.clone(),
@@ -233,7 +305,15 @@ async fn main() -> anyhow::Result<()> {
     let admin_pub = admin_ctx.clone();
     {
         let (u, dir) = (updater.clone(), args.state_dir.clone());
-        tokio::spawn(u.run(move || panel::load(&dir).map_or(true, |p| p.settings.updates.check)));
+        let acme_busy = acme.clone();
+        tokio::spawn(u.run(
+            move || {
+                panel::load(&dir)
+                    .map(|p| p.settings.updates)
+                    .unwrap_or_default()
+            },
+            move || acme_busy.any_issuing(),
+        ));
     }
     tokio::spawn(notify::run(notifier));
     tokio::spawn(admin::recheck_loop(admin_ctx.clone()));
@@ -442,6 +522,134 @@ async fn watch_config(state: Arc<AppState>, path: PathBuf, last_good: PathBuf, e
             }
         }
     }
+}
+
+/// GET a `/healthz` del pannello locale, con `std` soltanto (l'immagine Docker non ha `curl`).
+fn healthcheck(addr: SocketAddr) -> bool {
+    use std::io::{Read, Write};
+    let ip = if addr.ip().is_unspecified() {
+        std::net::Ipv4Addr::LOCALHOST.into()
+    } else {
+        addr.ip()
+    };
+    let target = SocketAddr::new(ip, addr.port());
+    let Ok(mut s) = std::net::TcpStream::connect_timeout(&target, Duration::from_secs(3)) else {
+        return false;
+    };
+    let _ = s.set_read_timeout(Some(Duration::from_secs(3)));
+    if s.write_all(b"GET /healthz HTTP/1.0\r\nHost: localhost\r\n\r\n")
+        .is_err()
+    {
+        return false;
+    }
+    let mut out = String::new();
+    let _ = s.read_to_string(&mut out);
+    out.starts_with("HTTP/1.0 200") || out.starts_with("HTTP/1.1 200")
+}
+
+/// Prova d'avvio: lancia se stesso con stato e porte temporanei e controlla che risponda.
+fn self_check() -> anyhow::Result<()> {
+    let free = || -> anyhow::Result<u16> {
+        Ok(std::net::TcpListener::bind("127.0.0.1:0")?
+            .local_addr()?
+            .port())
+    };
+    let (http, admin) = (free()?, free()?);
+    let dir = std::env::temp_dir().join(format!("otterroute-selfcheck-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir)?;
+    let exe = std::env::current_exe()?;
+    let mut child = std::process::Command::new(exe)
+        .args([
+            "--config",
+            &dir.join("config.yaml").to_string_lossy(),
+            "--listen",
+            &format!("127.0.0.1:{http}"),
+            "--admin-listen",
+            &format!("127.0.0.1:{admin}"),
+            "--https-listen",
+            "",
+            "--state-dir",
+            &dir.join("state").to_string_lossy(),
+            "--cache-dir",
+            &dir.join("cache").to_string_lossy(),
+            "--ui-dir",
+            &dir.join("ui").to_string_lossy(),
+        ])
+        .env("OTR_UPDATE_CHECK", "off")
+        .env_remove("OTR_DOCS_DIR")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()?;
+    let addr: SocketAddr = format!("127.0.0.1:{admin}").parse()?;
+    let mut ok = false;
+    for _ in 0..80 {
+        if healthcheck(addr) {
+            ok = true;
+            break;
+        }
+        if child.try_wait()?.is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = std::fs::remove_dir_all(&dir);
+    if ok {
+        println!("ok");
+        Ok(())
+    } else {
+        anyhow::bail!("il nodo non risponde a /healthz");
+    }
+}
+
+/// `--check-update` e `--self-update` da terminale.
+async fn update_cli(args: &Args) -> anyhow::Result<()> {
+    let u = update::Updater::new(args.state_dir.clone(), args.update_api.clone()).with_install(
+        Some(args.ui_dir.clone()),
+        args.docs_dir.clone(),
+        args.update_key.clone(),
+        Box::new(|| {}),
+    );
+    if update::env_disabled() {
+        anyhow::bail!("il controllo è disattivato da OTR_UPDATE_CHECK");
+    }
+    if let Err(e) = u.check().await {
+        anyhow::bail!("controllo non riuscito: {e}");
+    }
+    let s = u.state();
+    let panel = panel::load(&args.state_dir).unwrap_or_default();
+    let latest = if panel.settings.updates.prerelease {
+        s.latest_pre.or(s.latest)
+    } else {
+        s.latest
+    };
+    println!("versione in uso: {}", update::CURRENT);
+    let Some(r) = latest.filter(|r| update::is_newer(&r.version, update::CURRENT)) else {
+        println!("sei alla versione più recente");
+        return Ok(());
+    };
+    println!("versione disponibile: {} ({})", r.version, r.url);
+    if !args.self_update {
+        let (ok, why) = u.self_update_status();
+        if ok {
+            println!("aggiorna con: otterroute --self-update");
+        } else {
+            println!(
+                "aggiornamento automatico non disponibile: {}",
+                why.unwrap_or_default()
+            );
+        }
+        return Ok(());
+    }
+    let pending = u.prepare(&r).await.map_err(|e| anyhow::anyhow!(e))?;
+    println!(
+        "aggiornato a {} (la precedente resta in {}.prev). Riavvia il servizio per usarla: systemctl restart otterroute",
+        pending.to,
+        pending.exe.display()
+    );
+    Ok(())
 }
 
 async fn serve<F, Fut>(listener: TcpListener, f: F)

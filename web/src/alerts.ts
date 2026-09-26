@@ -59,6 +59,14 @@ export function buildAlerts(s: PanelState, can: (scope: string) => boolean): Ale
       text: `Prima era la ${u.updated_from}. Le novità sono nelle note della release.`,
       page: "settings",
     });
+  if (u?.rollback)
+    out.push({
+      id: `u:rollback:${u.rollback.to}`,
+      level: "warn",
+      title: `L’aggiornamento alla ${u.rollback.to} non è riuscito`,
+      text: `Il nodo è tornato alla versione precedente. ${u.rollback.reason}`,
+      page: "settings",
+    });
   const now = Date.now() / 1000;
   if (s.panel.settings.acme.enabled)
     for (const c of can("domains:read") ? s.certs : []) {

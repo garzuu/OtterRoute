@@ -92,6 +92,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
   const [upBusy, setUpBusy] = useState(false);
   const [upMsg, setUpMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const upd = state.panel.settings.updates;
+  const setWin = (w: { window_start?: number; window_end?: number }) => runUp(() => api.saveUpdates({ ...upd, ...w }), "Salvato.");
   const runUp = async (fn: () => Promise<unknown>, okText: string) => {
     setUpBusy(true);
     setUpMsg(null);
@@ -104,6 +105,45 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
     } finally {
       setUpBusy(false);
     }
+  };
+  const applyNow = async () => {
+    setUpBusy(true);
+    setUpMsg(null);
+    try {
+      await api.applyUpdate();
+    } catch (e) {
+      setUpMsg({ ok: false, text: (e as Error).message });
+      setUpBusy(false);
+      return;
+    }
+    setUpMsg({ ok: true, text: "Aggiornamento in corso…" });
+    // si segue lo stato reale: errore (resta com'è), riavvio (il nodo cade e torna) o completamento
+    const started = Date.now();
+    let wasDown = false;
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch("/api/panel");
+        if (!r.ok) throw new Error("non disponibile");
+        const p = (await r.json()) as PanelState;
+        if (wasDown || p.update.current !== up.current) {
+          clearInterval(poll);
+          window.location.reload();
+        } else if (!p.update.apply.running && p.update.apply.error) {
+          clearInterval(poll);
+          setUpMsg({ ok: false, text: p.update.apply.error });
+          setUpBusy(false);
+          await refresh();
+        } else if (p.update.apply.running) {
+          setUpMsg({ ok: true, text: `Aggiornamento in corso: ${p.update.apply.step}…` });
+        } else if (Date.now() - started > 60000) {
+          clearInterval(poll);
+          setUpBusy(false);
+        }
+      } catch {
+        wasDown = true; // il nodo si sta riavviando: alla prima risposta si ricarica
+        setUpMsg({ ok: true, text: "Il nodo si sta riavviando con la nuova versione…" });
+      }
+    }, 1500);
   };
   const HOW: Record<string, string> = {
     docker: "docker pull ghcr.io/garzuu/otterroute:" + (up.latest?.version ?? "VERSIONE") + "\ndocker stop otterroute && docker rm otterroute\n# rilancia lo STESSO comando run, con lo stesso volume /data",
@@ -233,10 +273,23 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
             </a>
             {up.latest.notes && <pre className="small-text" style={{ whiteSpace: "pre-wrap", margin: "8px 0 0" }}>{up.latest.notes}</pre>}
             <div className="small-text" style={{ marginTop: 8 }}>
-              <strong>Come aggiornare:</strong>
+              <strong>{up.can_self_update ? "Oppure a mano:" : "Come aggiornare:"}</strong>
               <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{HOW[up.kind]}</pre>
               Prima fai un backup della cartella di stato. Le sessioni di accesso si perdono al riavvio.
             </div>
+            {up.can_self_update ? (
+              <div className="nav" style={{ marginTop: 10 }}>
+                <span className="muted small-text">
+                  Scarica il pacchetto, ne verifica checksum e firma, lo prova, salva un backup e riavvia il nodo; se non parte bene torna alla versione precedente.
+                </span>
+                <button className="primary" onClick={applyNow} disabled={upBusy || up.apply.running || !canWrite}>
+                  {up.apply.running ? `In corso: ${up.apply.step}…` : "Aggiorna ora"}
+                </button>
+              </div>
+            ) : (
+              up.self_update_blocked && <div className="muted small-text" style={{ marginTop: 8 }}>Aggiornamento automatico non disponibile: {up.self_update_blocked}.</div>
+            )}
+            {up.apply.error && !upMsg && <div className="box bad" style={{ marginTop: 8 }}>{up.apply.error}</div>}
           </div>
         ) : (
           <div className="box good">{up.checked_at ? "Sei alla versione più recente." : "Ancora nessun controllo."}</div>
@@ -245,13 +298,34 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
         {up.checked_at > 0 && <p className="muted small-text">Ultimo controllo: {new Date(up.checked_at * 1000).toLocaleString("it-IT")}</p>}
         {up.env_disabled && <div className="box">Il controllo è disattivato da <code>OTR_UPDATE_CHECK=off</code>: il nodo non contatta GitHub.</div>}
         <label className="check">
-          <input type="checkbox" checked={upd.check} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates(e.target.checked, upd.prerelease), "Salvato.")} />
+          <input type="checkbox" checked={upd.check} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, check: e.target.checked }), "Salvato.")} />
           <span>Cerca ogni giorno le nuove versioni (una richiesta alle release pubbliche di GitHub, senza inviare dati del nodo).</span>
         </label>
         <label className="check">
-          <input type="checkbox" checked={upd.prerelease} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates(upd.check, e.target.checked), "Salvato.")} />
+          <input type="checkbox" checked={upd.prerelease} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, prerelease: e.target.checked }), "Salvato.")} />
           <span>Proponi anche le versioni di prova (pre-release).</span>
         </label>
+        {up.can_self_update && (
+          <>
+            <label className="check">
+              <input type="checkbox" checked={upd.auto} disabled={!canWrite || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, auto: e.target.checked }), "Salvato.")} />
+              <span>
+                Applica da solo le versioni di <strong>correzione</strong> (es. 0.1.x) dalle <strong>{String(upd.window_start).padStart(2, "0")}:00</strong> alle <strong>{String(upd.window_end).padStart(2, "0")}:00</strong> (ora del nodo). Le versioni minori e maggiori restano manuali.
+              </span>
+            </label>
+            {upd.auto && (
+              <div className="row">
+                <Field label="Dalle ore">
+                  <input value={String(upd.window_start)} inputMode="numeric" onChange={(e) => setWin({ window_start: Math.min(23, Number(e.target.value.replace(/\D/g, "") || 0)) })} />
+                </Field>
+                <Field label="Alle ore">
+                  <input value={String(upd.window_end)} inputMode="numeric" onChange={(e) => setWin({ window_end: Math.min(23, Number(e.target.value.replace(/\D/g, "") || 0)) })} />
+                </Field>
+              </div>
+            )}
+          </>
+        )}
+        {up.rollback && <div className="box warn">L’aggiornamento alla {up.rollback.to} è stato annullato: {up.rollback.reason}</div>}
         {upMsg && <div className={`box ${upMsg.ok ? "good" : "bad"}`}>{upMsg.text}</div>}
         <div className="nav">
           <span />

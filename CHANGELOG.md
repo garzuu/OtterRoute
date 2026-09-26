@@ -5,6 +5,10 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e i
 ## [Non rilasciato]
 
 ### Aggiunto
+- **Auto-aggiornamento del binario** (installazioni `binary` e `service`): *Aggiorna ora* dal pannello o `otterroute --self-update`; scarica solo da GitHub, verifica SHA-256 e firma Ed25519 (chiave pubblica nel binario), prova il nuovo eseguibile (`--version`, `--self-check`), salva un backup dello stato, sostituisce eseguibile, pannello e guida, si riavvia con `exec` e, se per 3 avvii non arriva la conferma, torna alla versione precedente. Opzionale e spento di default: applicazione automatica delle sole versioni di correzione in una finestra oraria.
+- `scripts/install.sh` (verifica checksum e firma, crea utente e servizio systemd), `--healthcheck` e `HEALTHCHECK` nell'immagine Docker, `SHA256SUMS` e firme nelle release.
+
+### Aggiunto
 - **Controllo delle nuove versioni**: una richiesta al giorno alle release di GitHub (spegnibile, `OTR_UPDATE_CHECK=off`), avviso nella campanella, scheda *Aggiornamenti* in Impostazioni con i passi per Docker, servizio, binario e sorgenti, avviso «aggiornato da A a B». Nuova pagina della guida per Docker (tag, Compose, Watchtower).
 
 ### Aggiunto
