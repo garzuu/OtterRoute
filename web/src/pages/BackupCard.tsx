@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { ApiError } from "../api";
 import { useAuth, needScope } from "../auth";
+import { loc, tr } from "../i18n";
 import { Field } from "../ui";
 
 interface Manifest {
@@ -53,7 +54,7 @@ export function BackupCard() {
       a.download = `otterroute-backup-${new Date().toISOString().slice(0, 10)}.otrbak`;
       a.click();
       URL.revokeObjectURL(url);
-      setMsg({ ok: true, text: "Backup scaricato. Conserva il file e la frase segreta in luoghi separati: senza la frase non si apre." });
+      setMsg({ ok: true, text: tr("bk.done") });
     });
 
   const body = async () => {
@@ -76,27 +77,27 @@ export function BackupCard() {
       const res = await fetch("/api/backup/restore", { method: "POST", headers: HDR, body: await body() });
       if (!res.ok) return fail(res);
       setInfo(null);
-      setMsg({ ok: true, text: "Ripristinato. Il nodo si sta riavviando: tra qualche secondo dovrai accedere di nuovo." });
+      setMsg({ ok: true, text: tr("bk.restored") });
       setTimeout(() => window.location.reload(), 6000);
     });
 
   return (
     <div className="card" id="backup">
-      <h2>Backup e ripristino</h2>
+      <h2>{tr("bk.title")}</h2>
       <p className="muted">
-        Un unico file cifrato con utenti, chiavi, certificati, domini, bucket e notifiche (non la cache). Contiene segreti: la frase serve per aprirlo e non si può recuperare.
+        {tr("bk.lead")}
       </p>
-      {!allowed && <div className="box">Serve lo scope <code>users:manage</code>.</div>}
-      <Field label="Frase segreta (almeno 12 caratteri)">
+      {!allowed && <div className="box">{tr("bk.needScope")}</div>}
+      <Field label={tr("bk.pass")}>
         <input type="password" autoComplete="new-password" value={pass} onChange={(e) => setPass(e.target.value)} disabled={!allowed} />
       </Field>
       <div className="nav">
         <span />
         <button className="secondary" onClick={download} disabled={busy || !allowed || pass.length < 12} title={allowed ? undefined : needScope("users:manage")}>
-          Scarica backup
+          {tr("bk.download")}
         </button>
       </div>
-      <Field label="Ripristina da un file">
+      <Field label={tr("bk.fromFile")}>
         <input
           ref={input}
           type="file"
@@ -110,7 +111,7 @@ export function BackupCard() {
       </Field>
       {info && (
         <div className="box warn">
-          Backup della versione <strong>{info.version}</strong> del {new Date(info.created_at * 1000).toLocaleString()} ({info.files.length} file). Ripristinando, <strong>lo stato attuale viene sostituito</strong> (una copia resta in <code>backups/pre-restore</code>), il nodo si riavvia e le sessioni si perdono.
+          {tr("bk.info", { version: info.version, date: new Date(info.created_at * 1000).toLocaleString(loc()), n: info.files.length })}
         </div>
       )}
       {msg && <div className={`box ${msg.ok ? "good" : "bad"}`}>{msg.text}</div>}
@@ -118,11 +119,11 @@ export function BackupCard() {
         <span />
         {info ? (
           <button className="primary" onClick={apply} disabled={busy}>
-            Ripristina ora
+            {tr("bk.restoreNow")}
           </button>
         ) : (
           <button className="secondary" onClick={check} disabled={busy || !allowed || !file || pass.length < 12}>
-            Controlla il file
+            {tr("bk.check")}
           </button>
         )}
       </div>

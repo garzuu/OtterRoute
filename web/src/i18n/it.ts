@@ -313,6 +313,17 @@ export const it = {
   "common.save": "Salva",
   "nt.last": "Ultime notifiche",
   "nt.none": "Ancora nessuna notifica inviata.",
+  "bk.done": "Backup scaricato. Conserva il file e la frase segreta in luoghi separati: senza la frase non si apre.",
+  "bk.restored": "Ripristinato. Il nodo si sta riavviando: tra qualche secondo dovrai accedere di nuovo.",
+  "bk.title": "Backup e ripristino",
+  "bk.lead": "Un unico file cifrato con utenti, chiavi, certificati, domini, bucket e notifiche (non la cache). Contiene segreti: la frase serve per aprirlo e non si può recuperare.",
+  "bk.needScope": "Serve lo scope users:manage.",
+  "bk.pass": "Frase segreta (almeno 12 caratteri)",
+  "bk.download": "Scarica backup",
+  "bk.fromFile": "Ripristina da un file",
+  "bk.info": "Backup della versione {version} del {date} ({n} file). Ripristinando, lo stato attuale viene sostituito (una copia resta in backups/pre-restore), il nodo si riavvia e le sessioni si perdono.",
+  "bk.restoreNow": "Ripristina ora",
+  "bk.check": "Controlla il file",
 } as const;
 
 export type Key = keyof typeof it;
