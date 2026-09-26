@@ -1,6 +1,7 @@
 ## [Non rilasciato]
 
 ### Aggiunto
+- **Notifiche** (email/Telegram) anche per nuove versioni, rollback di un aggiornamento e certificati in scadenza o scaduti, compresi quelli caricati a mano. Le notifiche di versione seguono l'interruttore del controllo aggiornamenti.
 - **Indirizzi ammessi per il pannello in HTTPS**: elenco di IP e reti CIDR (Impostazioni → Pannello in HTTPS, `PUT /api/admin-allow`); gli altri ricevono 404, la porta locale resta sempre aperta e dal pannello HTTPS non ci si può escludere da soli.
 - **Metriche Prometheus** per immagini al volo, link firmati, certificati (scadenza e stato di servizio), emissioni ACME, controlli e aggiornamenti, più `otterroute_build_info`. Query e allarmi di esempio nella guida.
 

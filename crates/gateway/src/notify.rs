@@ -69,7 +69,12 @@ fn domain_state(d: &panel::Domain) -> &'static str {
 }
 
 /// Tutto ciò che oggi richiede attenzione. Regole e testi allineati alla campanella.
-pub fn problems(p: &Panel, certs: &[crate::tls::CertInfo], now: u64) -> Vec<Problem> {
+pub fn problems(
+    p: &Panel,
+    certs: &[crate::tls::CertInfo],
+    upd: Option<&crate::update::State>,
+    now: u64,
+) -> Vec<Problem> {
     let mut out = Vec::new();
     for d in &p.domains {
         let st = domain_state(d);
@@ -135,6 +140,62 @@ pub fn problems(p: &Panel, certs: &[crate::tls::CertInfo], now: u64) -> Vec<Prob
                 level,
                 title: format!("{title} · {}", d.host),
                 text,
+            });
+        }
+    }
+    // certificati caricati a mano: nessun rinnovo automatico, ci pensa l'utente
+    if !p.settings.acme.enabled {
+        for d in p.domains.iter().filter(|d| d.verified) {
+            let Some(info) = certs
+                .iter()
+                .find(|c| c.host == d.host && c.not_after.is_some())
+            else {
+                continue;
+            };
+            let (level, title) = match crate::tls::status(info, now) {
+                "expired" => (Level::Error, "Certificato scaduto"),
+                "expiring" => (Level::Warn, "Certificato in scadenza"),
+                _ => continue,
+            };
+            out.push(Problem {
+                id: format!("c:{}", d.host),
+                level,
+                title: format!("{title} · {}", d.host),
+                text: "Il certificato è stato caricato a mano: rinnovalo e caricalo di nuovo (Domini → HTTPS).".into(),
+            });
+        }
+    }
+    // aggiornamenti: solo se il controllo è attivo
+    if let Some(u) = upd.filter(|_| p.settings.updates.check && !crate::update::env_disabled()) {
+        if let Some(r) = u
+            .rollback
+            .as_ref()
+            .filter(|r| now.saturating_sub(r.at) < 7 * 24 * 3600)
+        {
+            out.push(Problem {
+                id: "u:rollback".into(),
+                level: Level::Error,
+                title: format!("L'aggiornamento a {} non è riuscito", r.to),
+                text: format!(
+                    "Il nodo è tornato alla versione {}. Motivo: {}",
+                    crate::update::CURRENT,
+                    r.reason
+                ),
+            });
+        }
+        let latest = if p.settings.updates.prerelease {
+            u.latest_pre.as_ref().or(u.latest.as_ref())
+        } else {
+            u.latest.as_ref()
+        };
+        if let Some(r) =
+            latest.filter(|r| crate::update::is_newer(&r.version, crate::update::CURRENT))
+        {
+            out.push(Problem {
+                id: "u:available".into(),
+                level: Level::Warn,
+                title: format!("È disponibile la versione {}", r.version),
+                text: format!("In uso: {}. Note: {}", crate::update::CURRENT, r.url),
             });
         }
     }
@@ -710,7 +771,17 @@ impl Notifier {
             .iter()
             .map(|d| crate::tls::read_info(&self.state_dir, &d.host))
             .collect();
-        let events = plan(&mut state, &problems(&panel, &certs, t), &cfg, t);
+        let events = plan(
+            &mut state,
+            &problems(
+                &panel,
+                &certs,
+                Some(&crate::update::load(&self.state_dir)),
+                t,
+            ),
+            &cfg,
+            t,
+        );
         if let Ok(data) = serde_json::to_vec_pretty(&state) {
             let _ = crate::admin::write_atomic(&state_path(&self.state_dir), &data, false);
         }
@@ -801,7 +872,7 @@ mod tests {
             ],
             ..Panel::default()
         };
-        let got: Vec<(String, Level)> = problems(&p, &[], 0)
+        let got: Vec<(String, Level)> = problems(&p, &[], None, 0)
             .into_iter()
             .map(|x| (x.id, x.level))
             .collect();
@@ -815,11 +886,55 @@ mod tests {
             ("b:nofile", Level::Warn),
         ];
         assert_eq!(got, want.map(|(i, l)| (i.to_string(), l)));
-        let noreach = problems(&p, &[], 0)
+        let noreach = problems(&p, &[], None, 0)
             .into_iter()
             .find(|x| x.id == "d:noreach.it")
             .unwrap();
         assert!(noreach.title.starts_with("Il nodo non risponde"));
+    }
+
+    #[test]
+    fn update_problems() {
+        use crate::update::{Release, Rollback, State as Us};
+        let mut p = Panel::default();
+        let now = 1_000_000_000;
+        let rel = |v: &str| Release {
+            version: v.into(),
+            url: "https://example.com/r".into(),
+            ..Release::default()
+        };
+        let mut u = Us::default();
+        assert!(problems(&p, &[], Some(&u), now).is_empty());
+        u.latest = Some(rel("99.0.0"));
+        let got = problems(&p, &[], Some(&u), now);
+        assert_eq!(
+            (got[0].id.as_str(), got[0].level),
+            ("u:available", Level::Warn)
+        );
+        u.latest = Some(rel("0.0.1"));
+        assert!(
+            problems(&p, &[], Some(&u), now).is_empty(),
+            "non più recente"
+        );
+        u.rollback = Some(Rollback {
+            to: "9.9.9".into(),
+            reason: "non parte".into(),
+            at: now - 60,
+        });
+        let got = problems(&p, &[], Some(&u), now);
+        assert_eq!(
+            (got[0].id.as_str(), got[0].level),
+            ("u:rollback", Level::Error)
+        );
+        assert!(
+            problems(&p, &[], Some(&u), now + 8 * 86400).is_empty(),
+            "vecchio"
+        );
+        p.settings.updates.check = false;
+        assert!(
+            problems(&p, &[], Some(&u), now).is_empty(),
+            "controllo spento"
+        );
     }
 
     #[test]
@@ -839,10 +954,14 @@ mod tests {
                 message: m.into(),
             }),
         };
-        // certificati automatici spenti: nessun avviso
-        assert!(problems(&p, &[info(Some(now - 1), None)], now).is_empty());
+        // certificati automatici spenti: il certificato caricato a mano scaduto avvisa
+        let manual = problems(&p, &[info(Some(now - 1), None)], None, now);
+        assert_eq!(manual[0].level, Level::Error);
+        assert!(manual[0].text.contains("caricato a mano"));
+        assert!(problems(&p, &[info(Some(now + 40 * 86400), None)], None, now).is_empty());
+        assert!(problems(&p, &[info(None, Some("x"))], None, now).is_empty());
         p.settings.acme.enabled = true;
-        let one = |i: CertInfo| problems(&p, &[i], now);
+        let one = |i: CertInfo| problems(&p, &[i], None, now);
         assert!(one(info(Some(now + 40 * 86400), None)).is_empty(), "valido");
         assert!(
             one(info(None, None)).is_empty(),
@@ -859,7 +978,7 @@ mod tests {
         assert!(failed[0].text.contains("rifiutato"));
         // domini non certificabili (locali) e non verificati non generano avvisi
         p.domains = vec![domain("img.localhost", true, true, &[])];
-        assert!(problems(&p, &[], now).is_empty());
+        assert!(problems(&p, &[], None, now).is_empty());
     }
 
     fn prob(id: &str, level: Level) -> Problem {
