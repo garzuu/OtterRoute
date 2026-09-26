@@ -117,6 +117,9 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    // nel processo convivono due provider crittografici di rustls (ring e aws-lc-rs):
+    // senza un predefinito esplicito i client TLS (ACME, SMTP, reqwest) vanno in panic
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let args = Args::parse();
     std::fs::create_dir_all(&args.state_dir).context("state_dir")?;
     if let Some(name) = &args.reset_user {
