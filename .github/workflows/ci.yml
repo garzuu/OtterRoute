@@ -39,6 +39,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
         working-directory: web
+      - name: Traduzioni (stesse chiavi e segnaposto in IT ed EN)
+        run: npm run check:i18n
+        working-directory: web
       - name: Tipi e build del pannello
         run: npm run build
         working-directory: web

@@ -1,3 +1,5 @@
+import { tr } from "./i18n";
+
 /** Cosa deve fare l'utente prima di poter usare il pannello. */
 export type Requirement = "change_password" | "setup_2fa" | null;
 
@@ -275,7 +277,7 @@ async function request<T>(path: string, method = "GET", body?: unknown): Promise
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(data.error ?? `Errore ${res.status}`, res.status);
+  if (!res.ok) throw new ApiError(data.error ?? tr("common.errorN", { n: res.status }), res.status);
   return data as T;
 }
 

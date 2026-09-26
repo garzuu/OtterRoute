@@ -645,4 +645,6 @@ export const en: Record<Key, string> = {
   "rt.diagnoseTip": "Follows the request path and shows where it stops",
   "rt.diagnose": "Diagnosis",
   "rt.open": "Open",
+  "chart.histoAria": "Latency distribution",
+  "common.errorN": "Error {n}",
 };

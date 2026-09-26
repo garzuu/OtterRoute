@@ -643,6 +643,8 @@ export const it = {
   "rt.diagnoseTip": "Segue il percorso della richiesta e mostra dove si ferma",
   "rt.diagnose": "Diagnosi",
   "rt.open": "Apri",
+  "chart.histoAria": "Distribuzione della latenza",
+  "common.errorN": "Errore {n}",
 } as const;
 
 export type Key = keyof typeof it;

@@ -134,7 +134,7 @@ export function HBars(props: { items: { label: string; value: number; tone: "goo
 export function Histogram(props: { bins: { label: string; count: number }[] }) {
   const max = Math.max(1, ...props.bins.map((b) => b.count));
   return (
-    <div className="histo" role="img" aria-label="Distribuzione della latenza">
+    <div className="histo" role="img" aria-label={tr("chart.histoAria")}>
       {props.bins.map((b) => (
         <div key={b.label} className="hi-col" title={`${b.label}: ${fmtNum(b.count)}`}>
           <span className="hi-bar" style={{ height: `${Math.max(b.count ? 4 : 0, (b.count / max) * 100)}%` }} />
