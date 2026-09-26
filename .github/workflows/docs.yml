@@ -47,7 +47,9 @@ jobs:
         id: lychee
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --max-concurrency 4 --accept 200,201,204,301,302,403,429 'docs/it/**/*.md' 'docs/en/**/*.md'
+          # solo link esterni: quelli interni (./pagina, /en/…) non si risolvono sui .md di VitePress e si
+          # controllano già con la build della guida (`npm run docs:build`)
+          args: --no-progress --max-concurrency 4 --scheme http --scheme https --accept 200,201,204,301,302,403,429 'docs/it/**/*.md' 'docs/en/**/*.md'
           fail: false
       - name: Segnala i link rotti
         if: steps.lychee.outputs.exit_code != 0
