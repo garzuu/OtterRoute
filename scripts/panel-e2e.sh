@@ -323,6 +323,31 @@ check "controllo versione: eseguito e disponibile" 1 "$(mx | grep -c '^otterrout
 check "controlli riusciti contati" True "$(python3 -c "print(float('$(mval 'otterroute_update_checks_total{result="ok"}')') >= 1)")"
 check "ultimo controllo valorizzato" True "$(python3 -c "print(float('$(mval otterroute_update_last_check_timestamp_seconds)') > 1e9)")"
 
+echo "== backup e ripristino"
+PASS_BK="frase-di-prova-lunga"
+rbody() { python3 -c 'import struct,sys; p=sys.argv[1].encode(); sys.stdout.buffer.write(struct.pack(">I",len(p))+p+open(sys.argv[2],"rb").read())' "$1" "$2"; }
+rst() { rbody "$1" "$work/backup.otrbak" | curl -s -w '\n%{http_code}' -b "$work/jar" -c "$work/jar" -H 'X-OtterRoute-Restore: 1' -H 'Content-Type: application/octet-stream' --data-binary @- "$ADMIN/api/backup/restore$2"; }
+check "backup: frase troppo corta rifiutata" 422 "$(b='{"passphrase":"corta"}'; code $ADMIN/api/backup/export -d "$b")"
+curl -s -o "$work/backup.otrbak" -b "$work/jar" -H "$J" -d "{\"passphrase\":\"$PASS_BK\"}" $ADMIN/api/backup/export
+check "backup: file cifrato con intestazione OTRBK1" OTRBK1 "$(head -c 6 "$work/backup.otrbak")"
+check "…e senza i segreti in chiaro" 0 "$(grep -c 'SK' "$work/backup.otrbak")"
+check "ripristino senza l'intestazione di sicurezza" 400 "$(rbody "$PASS_BK" "$work/backup.otrbak" | curl -s -o /dev/null -w '%{http_code}' -b "$work/jar" -H 'Content-Type: application/octet-stream' --data-binary @- $ADMIN/api/backup/restore)"
+check "ripristino con frase errata" 422 "$(rst "un-altra-frase-lunga" "?dry=1" | tail -1)"
+check "controllo del backup (dry run)" 200 "$(rst "$PASS_BK" "?dry=1" | tail -1)"
+check "…mostra la versione del backup" 1 "$(rst "$PASS_BK" "?dry=1" | head -1 | jget "int(bool(d['manifest']['version']))")"
+dom_before="$(api $ADMIN/api/panel | jget "len(d['panel']['domains'])")"
+check "aggiungo un dominio dopo il backup" 200 "$(b='{"host":"dopo-backup.example.com"}'; code $ADMIN/api/domains -d "$b")"
+check "…il dry run non ha cambiato nulla" $((dom_before+1)) "$(rst "$PASS_BK" "?dry=1" >/dev/null; api $ADMIN/api/panel | jget "len(d['panel']['domains'])")"
+r="$(rst "$PASS_BK" "")"
+check "ripristino applicato" 200 "$(tail -1 <<<"$r")"
+for _ in $(seq 80); do sleep 0.25; curl -sf $ADMIN/healthz >/dev/null && break; done
+sleep 1
+rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"admin","password":"password-admin-1"}' >/dev/null
+check "dopo il riavvio il dominio aggiunto dopo il backup non c'è più" "$dom_before" "$(api $ADMIN/api/panel | jget "len(d['panel']['domains'])")"
+check "…gli utenti sono quelli del backup (login riuscito)" 200 "$(code $ADMIN/api/panel)"
+check "…lo stato precedente è stato conservato" 1 "$([[ -d "$work/state/backups/pre-restore" ]] && echo 1 || echo 0)"
+check "…il sito continua a servire" 200 "$(hs /barca.jpg)"
+
 echo "== permessi"
 api $ADMIN/api/users -d '{"username":"lettore","role":"viewer","password":"password-lettore-1"}' >/dev/null
 rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"lettore","password":"password-lettore-1"}' >/dev/null
@@ -336,6 +361,8 @@ check "sola lettura: niente caricamento certificati" 403 "$(b='{"host":"img.loca
 check "sola lettura: niente redirect" 403 "$(b='{"host":"img.localhost","enabled":true}'; code $ADMIN/api/domains/redirect -d "$b")"
 check "sola lettura: non attiva le immagini" 403 "$(code -X PUT $ADMIN/api/rules/$rid -d '{"images":true}')"
 check "sola lettura: non cambia le impostazioni degli aggiornamenti" 403 "$(b='{"check":false}'; code -X PUT $ADMIN/api/updates -d "$b")"
+check "sola lettura: niente backup" 403 "$(b='{"passphrase":"frase-di-prova-lunga"}'; code $ADMIN/api/backup/export -d "$b")"
+check "sola lettura: niente ripristino" 403 "$(code -X POST -H 'X-OtterRoute-Restore: 1' $ADMIN/api/backup/restore -d x)"
 check "sola lettura: non forza il controllo" 403 "$(code $ADMIN/api/update/check -d '{}')"
 check "sola lettura: niente link" 403 "$(b='{"rule":"x","path":"/a","ttl_secs":60}'; code $ADMIN/api/links -d "$b")"
 check "sola lettura: non ruota la chiave" 403 "$(code $ADMIN/api/links/rotate -d '{}')"

@@ -179,6 +179,8 @@ pub fn access(method: &Method, path: &str) -> Option<Access> {
             | "/api/updates",
         ) => Scope("settings:write"),
         ("POST", "/api/update/check" | "/api/update/apply") => Scope("settings:write"),
+        // contiene hash delle password e segreti: solo chi gestisce gli utenti
+        ("POST", "/api/backup/export" | "/api/backup/restore") => Scope("users:manage"),
         (
             "POST",
             "/api/domains"
@@ -283,6 +285,8 @@ async fn api(
         (&Method::POST, "/api/update/check") => update_check(admin, pr).await,
         (&Method::POST, "/api/update/apply") => update_apply(admin),
         (&Method::PUT, "/api/admin-host") => with_body!(AdminHostReq, set_admin_host),
+        (&Method::POST, "/api/backup/export") => with_body!(BackupReq, backup_export),
+        (&Method::POST, "/api/backup/restore") => backup_restore(admin, pr, req).await,
         (&Method::PUT, "/api/admin-allow") => with_body!(AdminAllowReq, set_admin_allow),
         (&Method::POST, "/api/certs/issue") => with_body!(HostReq, issue_cert),
         (&Method::POST, "/api/certs/upload") => with_body!(UploadCertReq, upload_cert),
@@ -1294,6 +1298,117 @@ async fn set_admin_host(admin: &Admin, req: AdminHostReq) -> Response<Body> {
     json(
         StatusCode::OK,
         json!({ "host": host, "url": url, "warnings": warnings }),
+    )
+}
+
+// --- backup e ripristino ------------------------------------------------------
+
+#[derive(Deserialize)]
+struct BackupReq {
+    passphrase: String,
+}
+
+async fn backup_export(admin: &Admin, req: BackupReq) -> Response<Body> {
+    let dir = admin.state_dir.clone();
+    let now = crate::update::now_pub();
+    let data = match tokio::task::spawn_blocking(move || {
+        crate::backup::create(&dir, &req.passphrase, now)
+    })
+    .await
+    {
+        Ok(Ok(d)) => d,
+        Ok(Err(e)) => return bad(e),
+        Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "backup interrotto"),
+    };
+    audit::log("backup.export", &format!("{} byte", data.len()));
+    let mut r = Response::new(body::full(data));
+    let h = r.headers_mut();
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/octet-stream"),
+    );
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    if let Ok(v) = HeaderValue::from_str(&format!(
+        "attachment; filename=\"otterroute-backup-{}.otrbak\"",
+        now
+    )) {
+        h.insert(header::CONTENT_DISPOSITION, v);
+    }
+    r
+}
+
+/// Corpo: 4 byte (lunghezza della frase, big endian) · frase · archivio. `?dry=1` solo controlla.
+/// L'intestazione `X-OtterRoute-Restore` obbliga il browser al preflight (niente richieste cross-origin).
+async fn backup_restore(
+    admin: &Admin,
+    _pr: &crate::auth::Principal,
+    req: Request<hyper::body::Incoming>,
+) -> Response<Body> {
+    if req.headers().get("x-otterroute-restore").is_none() {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "intestazione X-OtterRoute-Restore mancante",
+        );
+    }
+    let dry = req
+        .uri()
+        .query()
+        .is_some_and(|q| q.split('&').any(|p| p == "dry=1"));
+    let bytes = match Limited::new(req.into_body(), crate::backup::MAX_ARCHIVE + 4096)
+        .collect()
+        .await
+    {
+        Ok(b) => b.to_bytes(),
+        Err(_) => return error(StatusCode::PAYLOAD_TOO_LARGE, "file troppo grande"),
+    };
+    let Some(n) = bytes
+        .get(..4)
+        .map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]]) as usize)
+    else {
+        return bad("richiesta non valida");
+    };
+    let Some(pass) = bytes
+        .get(4..4 + n)
+        .and_then(|b| std::str::from_utf8(b).ok())
+        .map(str::to_owned)
+    else {
+        return bad("richiesta non valida");
+    };
+    let data = bytes.slice(4 + n..);
+    let opened = match tokio::task::spawn_blocking(move || crate::backup::open(&data, &pass)).await
+    {
+        Ok(Ok(o)) => o,
+        Ok(Err(e)) => return bad(e),
+        Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "ripristino interrotto"),
+    };
+    let m = opened.manifest.clone();
+    if dry {
+        return json(StatusCode::OK, json!({ "manifest": m, "applied": false }));
+    }
+    let _g = admin.write_lock.lock().await;
+    let snap = match crate::backup::apply(&admin.state_dir, &opened) {
+        Ok(s) => s,
+        Err(e) => return error(StatusCode::INTERNAL_SERVER_ERROR, e),
+    };
+    // regenera la configurazione dal pannello ripristinato (i segreti dei bucket sono già su disco)
+    if let Ok(p) = load_panel(admin) {
+        if let Err(e) = apply_config(admin, &p) {
+            tracing::warn!(error = %e, "configurazione dopo il ripristino");
+        }
+    }
+    audit::log(
+        "backup.restore",
+        &format!("da un backup del {} (versione {})", m.created_at, m.version),
+    );
+    // gli utenti e i certificati si leggono all'avvio: si riparte (stesso PID)
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+        let e = tokio::task::spawn_blocking(crate::backup::restart_self).await;
+        tracing::error!(error = ?e, "riavvio dopo il ripristino non riuscito");
+    });
+    json(
+        StatusCode::OK,
+        json!({ "manifest": m, "applied": true, "restarting": true, "previous_state": snap.display().to_string() }),
     )
 }
 
