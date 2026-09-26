@@ -231,8 +231,12 @@ impl Acme {
             Err(e) => Err(e),
         };
         match &out {
-            Ok(na) => tracing::info!(host, scade = na, "certificato emesso"),
+            Ok(na) => {
+                crate::metrics_extra::inc(&crate::metrics_extra::C.acme_ok);
+                tracing::info!(host, scade = na, "certificato emesso")
+            }
             Err(e) => {
+                crate::metrics_extra::inc(&crate::metrics_extra::C.acme_error);
                 tracing::warn!(host, error = %e, "emissione del certificato non riuscita");
                 tls::save_error(&self.state_dir, host, e, now_secs());
             }

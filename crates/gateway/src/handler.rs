@@ -279,6 +279,7 @@ async fn handle_inner(
         )
         .is_err()
     {
+        crate::metrics_extra::inc(&crate::metrics_extra::C.signed_denied);
         return Err(HttpError(StatusCode::FORBIDDEN, "forbidden"));
     }
     // immagini al volo: solo per gli instradamenti che lo chiedono e per file immagine
@@ -374,6 +375,7 @@ async fn load_original(
     match s3::fetch(&d.storage, &d.bucket, key, &Method::GET, &[]).await {
         Fetch::Ok(resp) if resp.status() == StatusCode::OK => {
             if resp.content_length().is_some_and(|l| l > cap) {
+                crate::metrics_extra::inc(&crate::metrics_extra::C.img_too_large);
                 return Err(TOO_LARGE);
             }
             let headers = forwarded(resp.headers());
@@ -382,6 +384,7 @@ async fn load_original(
             while let Some(chunk) = stream.next().await {
                 let chunk = chunk.map_err(|_| BAD_GATEWAY)?;
                 if buf.len() as u64 + chunk.len() as u64 > cap {
+                    crate::metrics_extra::inc(&crate::metrics_extra::C.img_too_large);
                     return Err(TOO_LARGE);
                 }
                 buf.extend_from_slice(&chunk);
@@ -446,16 +449,27 @@ async fn serve_variant(
     };
     let original = load_original(state, route, key).await?;
     let permit = image_slots().acquire().await.map_err(|_| BUSY)?;
+    let t0 = Instant::now();
     let job = tokio::task::spawn_blocking(move || crate::imgx::transform(&original, &p, out));
     let done = tokio::time::timeout(IMAGE_TIMEOUT, job).await;
     drop(permit);
     let bytes = match done {
-        Ok(Ok(Ok(b))) => b,
+        Ok(Ok(Ok(b))) => {
+            use crate::metrics_extra::{inc, C};
+            inc(&C.img_ok);
+            C.img_micros.fetch_add(
+                t0.elapsed().as_micros() as u64,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            b
+        }
         Ok(Ok(Err(msg))) => {
+            crate::metrics_extra::inc(&crate::metrics_extra::C.img_error);
             tracing::warn!(route = %route.id, %key, %msg, "immagine non trasformabile");
             return Err(UNPROCESSABLE);
         }
         _ => {
+            crate::metrics_extra::inc(&crate::metrics_extra::C.img_busy);
             tracing::warn!(route = %route.id, %key, "trasformazione interrotta o scaduta");
             return Err(BUSY);
         }
