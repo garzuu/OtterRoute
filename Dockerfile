@@ -38,5 +38,6 @@ ENV OTR_INSTALL=docker \
     OTR_LISTEN=0.0.0.0:80 \
     OTR_ADMIN_LISTEN=0.0.0.0:9090
 VOLUME ["/data"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["otterroute", "--healthcheck"]
 EXPOSE 80 443 9090
 ENTRYPOINT ["otterroute"]

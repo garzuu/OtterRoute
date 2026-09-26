@@ -92,6 +92,7 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
   const [upBusy, setUpBusy] = useState(false);
   const [upMsg, setUpMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const upd = state.panel.settings.updates;
+  const setWin = (w: { window_start?: number; window_end?: number }) => runUp(() => api.saveUpdates({ ...upd, ...w }), "Salvato.");
   const runUp = async (fn: () => Promise<unknown>, okText: string) => {
     setUpBusy(true);
     setUpMsg(null);
@@ -102,6 +103,30 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
     } catch (e) {
       setUpMsg({ ok: false, text: (e as Error).message });
     } finally {
+      setUpBusy(false);
+    }
+  };
+  const applyNow = async () => {
+    setUpBusy(true);
+    setUpMsg(null);
+    try {
+      await api.applyUpdate();
+      setUpMsg({ ok: true, text: "Aggiornamento avviato: il nodo si riavvia da solo. Questa pagina si ricarica quando è tornato." });
+      // il pannello si riavvia con il nodo: si aspetta che risponda con la nuova versione
+      const started = Date.now();
+      const poll = setInterval(async () => {
+        try {
+          const r = await fetch("/api/session");
+          if (r.ok && Date.now() - started > 4000) {
+            clearInterval(poll);
+            window.location.reload();
+          }
+        } catch {
+          /* il nodo si sta riavviando */
+        }
+      }, 2000);
+    } catch (e) {
+      setUpMsg({ ok: false, text: (e as Error).message });
       setUpBusy(false);
     }
   };
@@ -237,6 +262,19 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
               <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{HOW[up.kind]}</pre>
               Prima fai un backup della cartella di stato. Le sessioni di accesso si perdono al riavvio.
             </div>
+            {up.can_self_update ? (
+              <div className="nav" style={{ marginTop: 10 }}>
+                <span className="muted small-text">
+                  Scarica il pacchetto, ne verifica checksum e firma, lo prova, salva un backup e riavvia il nodo; se non parte bene torna alla versione precedente.
+                </span>
+                <button className="primary" onClick={applyNow} disabled={upBusy || up.apply.running || !canWrite}>
+                  {up.apply.running ? `In corso: ${up.apply.step}…` : "Aggiorna ora"}
+                </button>
+              </div>
+            ) : (
+              up.self_update_blocked && <div className="muted small-text" style={{ marginTop: 8 }}>Aggiornamento automatico non disponibile: {up.self_update_blocked}.</div>
+            )}
+            {up.apply.error && <div className="box bad" style={{ marginTop: 8 }}>{up.apply.error}</div>}
           </div>
         ) : (
           <div className="box good">{up.checked_at ? "Sei alla versione più recente." : "Ancora nessun controllo."}</div>
@@ -245,13 +283,34 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
         {up.checked_at > 0 && <p className="muted small-text">Ultimo controllo: {new Date(up.checked_at * 1000).toLocaleString("it-IT")}</p>}
         {up.env_disabled && <div className="box">Il controllo è disattivato da <code>OTR_UPDATE_CHECK=off</code>: il nodo non contatta GitHub.</div>}
         <label className="check">
-          <input type="checkbox" checked={upd.check} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates(e.target.checked, upd.prerelease), "Salvato.")} />
+          <input type="checkbox" checked={upd.check} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, check: e.target.checked }), "Salvato.")} />
           <span>Cerca ogni giorno le nuove versioni (una richiesta alle release pubbliche di GitHub, senza inviare dati del nodo).</span>
         </label>
         <label className="check">
-          <input type="checkbox" checked={upd.prerelease} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates(upd.check, e.target.checked), "Salvato.")} />
+          <input type="checkbox" checked={upd.prerelease} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, prerelease: e.target.checked }), "Salvato.")} />
           <span>Proponi anche le versioni di prova (pre-release).</span>
         </label>
+        {up.can_self_update && (
+          <>
+            <label className="check">
+              <input type="checkbox" checked={upd.auto} disabled={!canWrite || upBusy} onChange={(e) => runUp(() => api.saveUpdates({ ...upd, auto: e.target.checked }), "Salvato.")} />
+              <span>
+                Applica da solo le versioni di <strong>correzione</strong> (es. 0.1.x) dalle <strong>{String(upd.window_start).padStart(2, "0")}:00</strong> alle <strong>{String(upd.window_end).padStart(2, "0")}:00</strong> (ora del nodo). Le versioni minori e maggiori restano manuali.
+              </span>
+            </label>
+            {upd.auto && (
+              <div className="row">
+                <Field label="Dalle ore">
+                  <input value={String(upd.window_start)} inputMode="numeric" onChange={(e) => setWin({ window_start: Math.min(23, Number(e.target.value.replace(/\D/g, "") || 0)) })} />
+                </Field>
+                <Field label="Alle ore">
+                  <input value={String(upd.window_end)} inputMode="numeric" onChange={(e) => setWin({ window_end: Math.min(23, Number(e.target.value.replace(/\D/g, "") || 0)) })} />
+                </Field>
+              </div>
+            )}
+          </>
+        )}
+        {up.rollback && <div className="box warn">L’aggiornamento alla {up.rollback.to} è stato annullato: {up.rollback.reason}</div>}
         {upMsg && <div className={`box ${upMsg.ok ? "good" : "bad"}`}>{upMsg.text}</div>}
         <div className="nav">
           <span />

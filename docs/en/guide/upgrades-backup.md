@@ -41,7 +41,7 @@ The backup contains keys and hashes: keep it encrypted and with restricted permi
 
 ## Upgrading
 
-OtterRoute **does not update itself**: the panel warns you when a new version exists and shows the steps for your type of installation; you do the update.
+The panel warns you when a new version exists and shows the steps for your type of installation. With a **binary or service** installation the node can also **update itself** (see below); with **Docker** the image is replaced from outside.
 
 ### Knowing whether there is a new version
 
@@ -63,7 +63,32 @@ docker stop otterroute && docker rm otterroute
 # re-run the SAME "docker run" command as before (same ports, same /data volume)
 ```
 
-### Binary or service (systemd, launchd)
+### Automatic update (binary and service)
+
+If the node runs from an executable downloaded from the release (not Docker nor sources) and the service user can **write in the executable's folder**, **Update now** appears in **Settings → Updates**. From a terminal: `otterroute --self-update` (then restart the service) and `otterroute --check-update` to only learn whether a new version exists.
+
+What it does, in order (if a step fails the installation stays as it was):
+
+1. **Downloads** the package for your platform, only from GitHub, with a 100 MiB limit.
+2. **Verifies** the **SHA-256** and the **Ed25519 signature**. The public key is inside the binary; the private one is in the repository's secrets and signs every release. A package without a valid signature is **refused**: manual update is always possible.
+3. **Extracts** only the executable, `ui/` and `docs/` (no `..` paths, no symlinks) and **tests** the new executable: it declares the expected version and, started with temporary state and ports (`--self-check`), answers `/healthz`.
+4. **Backs up** the state (users, configuration, keys, certificates) into `state/backups/<version>/`, keeping the last 3.
+5. **Replaces** the executable, the panel and the guide, keeping the old ones as `otterroute.prev`, `ui.prev`, `docs.prev`.
+6. **Restarts** itself with the same PID and the same arguments: a service sees no restart. Login sessions are lost.
+
+**If the new version does not start well**: after the update the node counts starts; if **3 starts in a row get no confirmation** (60 seconds of regular operation) it restores the previous files by itself and restarts with the old version. The reason appears in the bell. Something must **restart the process** when it stops (systemd with `Restart=always` or `on-failure`). If the new executable refuses to start at all, the test in step 3 would already have found out before replacing it.
+
+**Automatic, if you want it** (off by default): the *Apply patch versions by itself* box installs versions of the same series (0.1.x) in the time window you choose (default 03:00–05:00, node time). Minor and major versions stay manual, it does not start during a certificate issuance and never installs a pre-release.
+
+::: warning What it does not do
+- A **data schema** change is not undone by itself: if the new version has already migrated the data, to go back also restore the backup in `state/backups/`.
+- There is no zero-downtime update: the node is down for a few seconds.
+- The signature protects as much as the secret that produces it: if the signing key were compromised a manual release with a new key would be needed.
+:::
+
+The package can also be installed from a fork or an internal mirror: set `OTR_UPDATE_API` and the public key you sign with (`OTR_UPDATE_KEY`).
+
+### Binary or service (systemd, launchd), by hand
 
 Download from the [releases page](https://github.com/garzuu/OtterRoute/releases) the package for your platform, verify its checksum and replace the executable (and the `ui/` and `docs/` folders next to it):
 

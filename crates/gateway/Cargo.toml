@@ -39,6 +39,9 @@ url = "2"
 hickory-resolver = { version = "0.26.3", default-features = false, features = ["tokio", "system-config"] }
 sha1 = "0.10"
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+tar = { version = "0.4", default-features = false }
+ring = "0.17"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 webp = { version = "0.3", default-features = false }
 instant-acme = { version = "0.8", default-features = false, features = ["ring", "hyper-rustls", "rcgen"] }

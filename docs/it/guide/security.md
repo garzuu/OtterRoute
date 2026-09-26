@@ -38,6 +38,10 @@ OtterRoute serve file di **sola lettura** da bucket privati. Chi lo visita non h
 
 I segreti 2FA sono conservati in chiaro nel file, come le chiavi dei bucket: proteggi la cartella con i permessi del sistema e con la cifratura del disco.
 
+## Aggiornamenti firmati
+
+Le release sono firmate con **Ed25519**: la chiave pubblica è incorporata nel binario, la privata sta nei segreti del repository e non esce dalla CI. L'[aggiornamento automatico](./upgrades-backup) scarica solo da GitHub e **rifiuta** un pacchetto senza firma valida, con checksum diverso o con percorsi pericolosi; lo stesso fa `scripts/install.sh`. Il controllo delle versioni (una richiesta al giorno) non invia dati del nodo e si spegne con `OTR_UPDATE_CHECK=off`.
+
 ## Limiti da conoscere
 
 - Le sessioni stanno in memoria: un riavvio disconnette tutti.

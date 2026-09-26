@@ -79,6 +79,11 @@ impl Acme {
         self.kick.notify_one();
     }
 
+    /// C'è un'emissione in corso? Un aggiornamento automatico aspetta.
+    pub fn any_issuing(&self) -> bool {
+        !self.issuing.lock().unwrap().is_empty()
+    }
+
     pub fn is_issuing(&self, host: &str) -> bool {
         self.issuing.lock().unwrap().contains(host)
     }

@@ -110,6 +110,10 @@ export interface UpdateInfo {
   error: string | null;
   /** versione da cui si è appena aggiornato (24 ore) */
   updated_from: string | null;
+  rollback: { to: string; reason: string; at: number } | null;
+  can_self_update: boolean;
+  self_update_blocked: string | null;
+  apply: { running: boolean; step: string; error: string | null; restarting: boolean };
 }
 
 export interface CertInfo {
@@ -192,7 +196,7 @@ export interface PanelState {
   recheck_minutes: number;
   recheck_verified_minutes: number;
   panel: {
-    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings; admin_host: string | null; updates: { check: boolean; prerelease: boolean } };
+    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings; admin_host: string | null; updates: { check: boolean; prerelease: boolean; auto: boolean; window_start: number; window_end: number } };
     domains: DomainInfo[];
     buckets: BucketInfo[];
     rules: RuleInfo[];
@@ -382,7 +386,8 @@ export const api = {
     post<RuleInfo>("/api/rules", r),
   setAdminHost: (host: string | null) =>
     request<{ host: string | null; url: string | null; warnings: string[] }>("/api/admin-host", "PUT", { host }),
-  saveUpdates: (check: boolean, prerelease: boolean) => request<UpdateInfo>("/api/updates", "PUT", { check, prerelease }),
+  saveUpdates: (b: { check: boolean; prerelease: boolean; auto?: boolean; window_start?: number; window_end?: number }) => request<UpdateInfo>("/api/updates", "PUT", b),
+  applyUpdate: () => post<{ started: boolean }>("/api/update/apply"),
   checkUpdate: () => post<UpdateInfo>("/api/update/check"),
   saveHttps: (b: AcmeSettings) => request<AcmeSettings>("/api/https", "PUT", b),
   issueCert: (host: string) => post<{ started: boolean }>("/api/certs/issue", { host }),

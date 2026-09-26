@@ -27,6 +27,17 @@ docker run -d --name otterroute \
 - The `/data` volume holds cache and state (users, credentials, configuration): keep it and [back it up](./upgrades-backup).
 - The image starts as an unprivileged user. In the repository, `compose.yaml` sets `net.ipv4.ip_unprivileged_port_start=0` to let it use port 80; with `docker run` the same is achieved with `--sysctl net.ipv4.ip_unprivileged_port_start=0`.
 
+## From a script (Linux and macOS)
+
+The script downloads the release, verifies its **checksum and signature** and installs it under `/usr/local` (on Linux, as root, it also creates the user and the systemd service, with permissions that allow [automatic update](./upgrades-backup)):
+
+```sh
+curl -fsSL https://github.com/garzuu/OtterRoute/releases/latest/download/install.sh | sudo sh
+# or a specific version:  sudo sh install.sh --version 0.1.0
+```
+
+Running it again updates an existing installation (it keeps the old executable as `otterroute.prev`). Afterwards: `sudo systemctl enable --now otterroute`.
+
 ## From source
 
 ```sh

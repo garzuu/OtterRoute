@@ -12,7 +12,29 @@ permissions:
   packages: write
 
 jobs:
+  version:
+    name: Versione e tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Il tag deve coincidere con la versione del workspace
+        shell: bash
+        run: |
+          cargo_v="$(awk -F'"' '/^version *=/ {print $2; exit}' Cargo.toml)"
+          tag="${GITHUB_REF_NAME#v}"
+          base="${tag%%-*}"
+          echo "tag=$tag  Cargo.toml=$cargo_v"
+          # una release vera deve avere esattamente la versione del binario: l'auto-aggiornamento
+          # controlla che il nuovo eseguibile dichiari quella versione
+          if [ "$tag" = "$base" ] && [ "$tag" != "$cargo_v" ]; then
+            echo "::error::il tag v$tag non coincide con la versione $cargo_v di Cargo.toml"; exit 1
+          fi
+          if [ "$base" != "$cargo_v" ]; then
+            echo "::error::il tag v$tag non è basato sulla versione $cargo_v di Cargo.toml"; exit 1
+          fi
+
   assets:
+    needs: version
     name: Pannello e guida
     runs-on: ubuntu-latest
     steps:
@@ -138,6 +160,24 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { pattern: bin-*, path: dist, merge-multiple: true }
+      - name: Firma dei pacchetti (Ed25519) e SHA256SUMS
+        shell: bash
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          cd dist
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::warning::segreto UPDATE_SIGNING_KEY assente: pacchetti NON firmati, l'auto-aggiornamento li rifiuterà"
+          else
+            key="$(mktemp)"; umask 077; printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key"
+            for f in otterroute-*.tar.gz; do
+              openssl pkeyutl -sign -inkey "$key" -rawin -in "$f" -out "$f.sig"
+            done
+            shred -u "$key" 2>/dev/null || rm -f "$key"
+            ls -l ./*.sig
+          fi
+          sha256sum otterroute-*.tar.gz > SHA256SUMS
+          cp ../scripts/install.sh install.sh
       - name: Note dal CHANGELOG
         shell: bash
         run: |
