@@ -5,67 +5,67 @@
 <h1 align="center">OtterRoute</h1>
 
 <p align="center">
-  <strong>Pubblica i tuoi bucket S3 privati su più domini, con cache su disco. Senza toccare un proxy.</strong><br>
-  <sub>Self-hosted · sola lettura · un solo binario · pannello in italiano e inglese</sub>
+  <strong>Publish your private S3 buckets on your own domains, with a disk cache. No proxy to configure.</strong><br>
+  <sub>Self-hosted · read-only · a single binary · panel in English and Italian</sub>
 </p>
 
 <p align="center">
   <a href="https://github.com/garzuu/OtterRoute/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/garzuu/OtterRoute/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/garzuu/OtterRoute/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/garzuu/OtterRoute?display_name=tag&sort=semver"></a>
-  <a href="https://github.com/garzuu/OtterRoute/pkgs/container/otterroute"><img alt="Immagine Docker" src="https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white"></a>
-  <img alt="Licenza" src="https://img.shields.io/badge/licenza-MIT%20%2F%20Apache--2.0-blue">
+  <a href="https://github.com/garzuu/OtterRoute/pkgs/container/otterroute"><img alt="Docker image" src="https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white"></a>
+  <img alt="License" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue">
 </p>
 
 <p align="center">
-  <a href="https://garzuu.github.io/OtterRoute/"><b>📖 Guida</b></a> ·
-  <a href="https://garzuu.github.io/OtterRoute/en/"><b>English guide</b></a> ·
-  <a href="#avvio-rapido">Avvio rapido</a> ·
-  <a href="#english">English</a> ·
-  <a href="CHANGELOG.md">Novità</a>
+  <a href="README.it.md">Italiano</a> · <b>English</b><br>
+  <a href="https://garzuu.github.io/OtterRoute/en/"><b>📖 Documentation</b></a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
-  <img src="docs/public/screens/overview.jpg" alt="La panoramica del pannello: richieste, cache hit, banda e latenza" width="860">
+  <img src="docs/public/screens/overview.jpg" alt="The panel overview: requests, cache hit ratio, bandwidth and latency" width="860">
 </p>
 
 ---
 
-## Perché
+## Why
 
-Hai file in uno o più bucket S3 (AWS, Cloudflare R2, Backblaze B2, Wasabi, Hetzner, MinIO, Garage…) e vuoi servirli da **`cdn.tuosito.it`** senza rendere pubblico il bucket, senza scrivere regole di proxy e senza pagare ogni richiesta allo storage.
+You keep files in one or more S3 buckets (AWS, Cloudflare R2, Backblaze B2, Wasabi, Hetzner, MinIO, Garage…) and want to serve them from **`cdn.example.com`** without making the bucket public, without writing proxy rules, and without paying for every request to the storage.
 
-Colleghi lo storage, associ un dominio, e ottieni un URL che funziona. Il nodo **verifica davvero** che il dominio arrivi a lui, tiene i file in cache su disco e ti dice, in italiano, dove si ferma una richiesta quando qualcosa non va.
+Connect a storage, attach a domain, and get a URL that works. The node **really verifies** that the domain reaches it, keeps files in a disk cache, and tells you where a request stops when something is wrong.
 
 <p align="center">
-  <img src="docs/diagrams/standalone/architecture.it.svg" alt="Architettura: visitatori, domini, nodo OtterRoute con cache su disco, bucket S3" width="760">
+  <img src="docs/diagrams/standalone/architecture.en.svg" alt="Architecture: visitors, domains, the OtterRoute node with its disk cache, S3 buckets" width="760">
 </p>
 
-## Cosa fa
+## What it does
 
 | | |
 |---|---|
-| 🌐 **Più domini, più bucket** | Instradamento per host e prefisso di percorso; ogni bucket ha le sue credenziali, la cache è isolata. |
-| 🔒 **Sola lettura** | Solo `GET` e `HEAD`, firma SigV4. Una sola richiesta allo storage per oggetto, poi si serve dalla cache. |
-| ✅ **Domini verificati sul serio** | DNS più una richiesta vera al nodo. Se un dominio smette di arrivare, lo vedi e ti avvisiamo. |
-| 🔐 **HTTPS automatico** | Certificati gratuiti (Let's Encrypt, HTTP-01) che si rinnovano da soli; oppure carichi il tuo. Anche il pannello può stare in HTTPS, con elenco di IP ammessi. |
-| 🖼️ **Immagini al volo** | Ridimensionamento e conversione (WebP incluso) con `?w=800&fmt=auto`; le varianti restano in cache. |
-| 🔗 **Link firmati** | File privati apribili solo con un link a scadenza, per singolo instradamento. |
-| 🧭 **Diagnosi** | Scrivi l'indirizzo di un file che non va: il nodo segue il percorso (DNS, nodo, instradamento, cache, storage) e dice cosa fare. |
-| 🧹 **Cache sotto controllo** | Svuota un file o un instradamento, precarica un elenco di file. |
-| 👥 **Utenti e sicurezza** | Ruoli e permessi, 2FA con codici di recupero, blocco dei tentativi, registro delle attività. |
-| 🔔 **Notifiche** | Email (SMTP) e Telegram quando un dominio, un bucket o un certificato va in errore, quando c'è una versione nuova o un aggiornamento fallisce, e quando tutto rientra. |
-| 📈 **Metriche** | Statistiche nel pannello e endpoint Prometheus su `/metrics`. |
-| 🔄 **Aggiornamenti e backup** | Controllo versioni, auto-aggiornamento con firma Ed25519 e rollback; backup cifrato scaricabile dal pannello e ripristino con controlli di versione. |
-| 🌍 **Italiano e inglese** | Pannello e guida in due lingue; la guida è disponibile anche offline sulla porta del pannello. |
+| 🌐 **Many domains, many buckets** | Routing by host and path prefix; each bucket has its own credentials and an isolated cache. |
+| 🔒 **Read-only** | `GET` and `HEAD` only, SigV4 signing. One request to the storage per object, then served from the cache. |
+| ✅ **Domains verified for real** | DNS plus a real request to the node. If a domain stops reaching it, you see it and get notified. |
+| 🔐 **Automatic HTTPS** | Free certificates (Let's Encrypt, HTTP-01) that renew themselves, or upload your own. The panel can also run over HTTPS, with an IP allow-list. |
+| 🖼️ **On-the-fly images** | Resizing and conversion (WebP included) with `?w=800&fmt=auto`; variants stay in the cache. |
+| 🔗 **Signed links** | Private files that open only with an expiring link, per route. |
+| 🧭 **Diagnosis** | Type the address of a file that does not work: the node follows the request path (DNS, node, route, cache, storage) and tells you what to do. |
+| 🧹 **Cache under control** | Purge a file or a whole route, warm up a list of files. |
+| 👥 **Users and security** | Roles and permissions, 2FA with recovery codes, brute-force lockout, activity log. |
+| 🔔 **Notifications** | Email (SMTP) and Telegram when a domain, bucket or certificate fails, when a new version is out or an update fails, and when everything is back to normal. |
+| 📈 **Metrics** | Statistics in the panel and a Prometheus endpoint on `/metrics`. |
+| 🔄 **Updates and backup** | Version check, self-update with Ed25519 signature and rollback; encrypted backup you can download from the panel, restore with version checks. |
+| 🌍 **English and Italian** | Panel and documentation in two languages; the documentation is also available offline on the panel port. |
 
 <p align="center">
-  <img src="docs/public/screens/domains.jpg" alt="La pagina Domini con gli stati di verifica" width="420">
-  <img src="docs/public/screens/routes.jpg" alt="La pagina Instradamenti" width="420">
+  <img src="docs/public/screens/domains.jpg" alt="The Domains page with verification states" width="420">
+  <img src="docs/public/screens/routes.jpg" alt="The Routes page" width="420">
 </p>
+<p align="center"><sub>Screenshots show the Italian interface; the panel switches to English from the user menu.</sub></p>
 
-## Avvio rapido
+## Quick start
 
-**Docker** (immagini `amd64` e `arm64` su GHCR):
+**Docker** (`amd64` and `arm64` images on GHCR):
 
 ```sh
 docker run -d --name otterroute --restart unless-stopped \
@@ -75,74 +75,47 @@ docker run -d --name otterroute --restart unless-stopped \
   ghcr.io/garzuu/otterroute:0.1
 ```
 
-**Binario** (Linux e macOS; verifica checksum e firma, e su Linux crea il servizio systemd):
+**Binary** (Linux and macOS; verifies checksum and signature, and on Linux sets up a systemd service):
 
 ```sh
 curl -fsSL https://github.com/garzuu/OtterRoute/releases/latest/download/install.sh | sudo sh
 ```
 
-Poi apri **`http://127.0.0.1:9090/`**, crea l'amministratore e segui la configurazione guidata: dominio → bucket → instradamento. Il pannello resta **solo in locale** (`127.0.0.1`): non pubblicare mai la 9090 su tutte le interfacce. La guida è anche offline, su `http://127.0.0.1:9090/docs/`.
+Then open **`http://127.0.0.1:9090/`**, create the administrator and follow the guided setup: domain → bucket → route. The panel stays **local only** (`127.0.0.1`): never publish port 9090 on all interfaces. The documentation is also available offline at `http://127.0.0.1:9090/docs/`.
 
-> 💡 Dietro Cloudflare o un altro proxy? Vedi [HTTPS e proxy](https://garzuu.github.io/OtterRoute/guide/https-proxy). Docker Compose, Watchtower, systemd e launchd sono nella [guida all'installazione](https://garzuu.github.io/OtterRoute/guide/install).
+> 💡 Behind Cloudflare or another proxy? See [HTTPS and proxy](https://garzuu.github.io/OtterRoute/en/guide/https-proxy). Docker Compose, Watchtower, systemd and launchd are covered in the [installation guide](https://garzuu.github.io/OtterRoute/en/guide/install).
 
-## La guida
+## Documentation
 
-Come funziona, installazione, DNS e storage **provider per provider** (Cloudflare, Route 53, Google Cloud DNS, Azure DNS, OVHcloud, Aruba · AWS S3, R2, Backblaze B2, Wasabi, DigitalOcean Spaces, Hetzner, MinIO, Garage), HTTPS, utenti e 2FA, immagini, link firmati, metriche, sicurezza e risoluzione dei problemi: **[garzuu.github.io/OtterRoute](https://garzuu.github.io/OtterRoute/)**. I sorgenti sono in [`docs/`](docs/).
+How it works, installation, DNS and storage **provider by provider** (Cloudflare, Route 53, Google Cloud DNS, Azure DNS, OVHcloud, Aruba · AWS S3, R2, Backblaze B2, Wasabi, DigitalOcean Spaces, Hetzner, MinIO, Garage), HTTPS, users and 2FA, images, signed links, metrics, security and troubleshooting: **[garzuu.github.io/OtterRoute/en](https://garzuu.github.io/OtterRoute/en/)**. The sources are in [`docs/`](docs/).
 
-## Sviluppo
+## Development
 
 ```sh
-cargo test --workspace               # include i controlli sulla documentazione
-./scripts/local-e2e.sh               # due finti S3 con firma SigV4 e test end-to-end
-./scripts/panel-e2e.sh               # il pannello contro un nodo vero (cache, HTTPS, aggiornamenti, backup…)
-./scripts/auth-smoke.sh              # utenti, scope, 2FA e audit
-cd web  && npm ci && npm run build   # pannello (npm run check:i18n: traduzioni)
-cd docs && npm ci && npm run dev     # guida (docs:build: parità IT/EN + link)
+cargo test --workspace               # includes the documentation checks
+./scripts/local-e2e.sh               # two fake S3 servers with SigV4 and end-to-end tests
+./scripts/panel-e2e.sh               # the panel against a real node (cache, HTTPS, updates, backup…)
+./scripts/auth-smoke.sh              # users, scopes, 2FA and audit
+cd web  && npm ci && npm run build   # panel (npm run check:i18n: translations)
+cd docs && npm ci && npm run dev     # documentation (docs:build: IT/EN parity + links)
 ```
 
-I test in [`docs_check.rs`](crates/gateway/src/docs_check.rs) confrontano la documentazione con il codice: esempi `config.yaml`, variabili `OTR_*`, scope e metriche. Una pagina inglese va aggiornata insieme a quella italiana. Vedi [CONTRIBUTING](CONTRIBUTING.md) e [SECURITY](SECURITY.md).
+The tests in [`docs_check.rs`](crates/gateway/src/docs_check.rs) compare the documentation against the code: `config.yaml` examples, `OTR_*` variables, scopes and metrics. An English page must be updated together with its Italian counterpart. See [CONTRIBUTING](CONTRIBUTING.md) and [SECURITY](SECURITY.md) (in Italian).
 
-## Stato
+## Status
 
-Versione **0.1.x**: un nodo singolo completo, pronto per essere provato.
+Version **0.1.x**: a complete single node, ready to try.
 
-| Fase | Stato |
+| Stage | Status |
 |---|---|
-| Prototipo tecnico: due domini, due bucket privati, cache isolata | ✅ |
-| Nodo singolo: pannello, utenti, HTTPS automatico, diagnosi, notifiche, backup, aggiornamenti | ✅ |
-| Link firmati e immagini al volo | ✅ |
-| Cluster: Helm, configurazioni sincronizzate, stato di applicazione per replica | 🔜 |
-| Accessi separati per cliente | 🔜 |
+| Technical prototype: two domains, two private buckets, isolated cache | ✅ |
+| Single node: panel, users, automatic HTTPS, diagnosis, notifications, backup, updates | ✅ |
+| Signed links and on-the-fly images | ✅ |
+| Cluster: Helm, synchronized configuration, per-replica apply status | 🔜 |
+| Per-customer separate access | 🔜 |
 
 ---
 
-## English
+## License
 
-<details open>
-<summary><b>OtterRoute</b> — a self-hosted, read-only gateway that publishes private S3 buckets on your own domains, with a disk cache.</summary>
-
-<br>
-
-Connect a storage, attach a domain, get a working URL — no proxy configuration. The node really **verifies** that each domain reaches it, caches files on disk (one upstream request per object), and tells you where a request stops when something is wrong.
-
-**Highlights** — several domains and buckets with per-route prefixes · read-only (`GET`/`HEAD`, SigV4) · automatic HTTPS (Let's Encrypt) and the panel over HTTPS with an IP allow-list · on-the-fly image resizing and WebP · signed, expiring links · request diagnosis · cache purge and warm-up · users, roles, 2FA and an activity log · email and Telegram notifications (domains, buckets, certificates, updates) · Prometheus metrics · signed self-update with rollback · encrypted backup and restore · panel and guide in English and Italian, also available offline.
-
-**Quick start**
-
-```sh
-docker run -d --name otterroute --restart unless-stopped \
-  -p 80:80 -p 443:443 -p 127.0.0.1:9090:9090 \
-  --sysctl net.ipv4.ip_unprivileged_port_start=0 \
-  -v otterroute-data:/data \
-  ghcr.io/garzuu/otterroute:0.1
-```
-
-Open `http://127.0.0.1:9090/`, create the administrator and follow the guided setup. Keep port 9090 on `127.0.0.1`. Binaries for Linux and macOS are on the [releases page](https://github.com/garzuu/OtterRoute/releases) (or use the `install.sh` above).
-
-**Documentation** — including DNS and S3 provider guides: <https://garzuu.github.io/OtterRoute/en/>
-
-</details>
-
-## Licenza · License
-
-MIT oppure Apache-2.0, a scelta. · MIT or Apache-2.0, at your option.
+MIT or Apache-2.0, at your option.
