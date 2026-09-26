@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Alert } from "./alerts";
 import { ROLE_LABEL } from "./auth";
-import { LangSwitch, useT } from "./i18n";
+import { LangSwitch, curLang, useT } from "./i18n";
+import { HELP_EN } from "./helpEn";
 import { docsHref } from "./ui";
 import type { PageId } from "./Dashboard";
 import { IconBell, IconCheck, IconChevronDown, IconLogout, IconMenu, IconUser } from "./icons";
@@ -140,11 +141,14 @@ export function Topbar(props: {
               <div className="pop-head">{t("top.help")}</div>
               <div className="help-sub">{t("top.helpHere")}</div>
               <div className="help-links">
-                {HELP[props.page].map(([label, to]) => (
+                {HELP[props.page].map(([itLabel, itTo]) => {
+                  const [label, to] = curLang() === "en" ? (HELP_EN[itTo] ?? [itLabel, itTo]) : [itLabel, itTo];
+                  return (
                   <a key={to} href={docsHref(to) ?? "#"} target="_blank" rel="noreferrer" onClick={() => help.setOpen(false)}>
                     {label} <span>↗</span>
                   </a>
-                ))}
+                  );
+                })}
               </div>
               <div className="help-sub">{t("top.helpMore")}</div>
               <div className="help-links">

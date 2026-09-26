@@ -27,6 +27,7 @@ if (typeof document !== "undefined") document.documentElement.lang = current;
 
 /** Formato di date e numeri della lingua in uso (per le funzioni fuori dai componenti). */
 export const loc = () => LOCALES[current];
+export const curLang = () => current;
 
 function fill(msg: string, p?: Params): string {
   return p ? msg.replace(/\{(\w+)\}/g, (m, k: string) => (k in p ? String(p[k]) : m)) : msg;

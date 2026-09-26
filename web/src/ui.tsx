@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { loc, tr } from "./i18n";
+import { curLang, loc, tr } from "./i18n";
 import { IconCheck, IconMinus, IconX } from "./icons";
 
 export function Field(props: { label: string; hint?: ReactNode; children: ReactNode }) {
@@ -54,7 +54,7 @@ export function setDocsBase(url: string | null | undefined) {
 }
 
 /** Indirizzo di una pagina (con ancora) della guida; null se non c'è una guida. */
-export const docsHref = (page: string): string | null => (docsBase ? `${docsBase}${page}` : null);
+export const docsHref = (page: string): string | null => (docsBase ? `${docsBase}${curLang() === "en" ? "en/" : ""}${page}` : null);
 
 export function Page(props: { title: string; lead?: string; children: ReactNode }) {
   return (
