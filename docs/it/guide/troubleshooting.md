@@ -43,7 +43,9 @@ Cerca il messaggio che vedi nel pannello o nella risposta. Se non lo trovi, la p
 | *troppi tentativi: riprova tra N minuti* | 5 errori in 5 minuti. | Attendi. |
 | *codice errato* | Codice 2FA sbagliato o già usato, orologio sfasato. | Sincronizza l'ora del telefono; attendi il codice successivo o usa un codice di recupero. |
 | Perso password/2FA (ultimo amministratore) | — | `otterroute --reset-user NOME` sul nodo. |
-| Il pannello non si apre | La porta 9090 ascolta solo su `127.0.0.1`. | Usa un tunnel SSH: `ssh -L 9090:127.0.0.1:9090 server`. |
+| Il pannello non si apre | La porta 9090 ascolta solo su `127.0.0.1`. | Usa un tunnel SSH: `ssh -L 9090:127.0.0.1:9090 server`, oppure [servilo in HTTPS](./panel-https). |
+| Il pannello in HTTPS reindirizza all'infinito | Cloudflare è in SSL **Flexible**: parla al nodo in HTTP. | Passa a **Full**. |
+| Il pannello in HTTPS non si apre (errore TLS o 525/521) | Il certificato del dominio è scaduto o manca, oppure la 443 non è raggiungibile. | Ripristina dal tunnel locale (Domini → HTTPS) e controlla il firewall. |
 | Login richiesto di nuovo dopo il riavvio | Le sessioni sono in memoria. | Normale. |
 
 ## Notifiche

@@ -31,7 +31,7 @@ Increase `cache_generation` in the destination; old copies are no longer used. �
 Each node is independent, with its own cache and its own panel. There is no shared controller.
 
 **Can I expose the panel on the Internet?**
-Not recommended. It listens on `127.0.0.1:9090`; use an SSH tunnel or a VPN. → [Security](./security)
+By default no: it listens on `127.0.0.1:9090`, use an SSH tunnel or a VPN. If you want to use it from a browser you can serve it over HTTPS on a dedicated domain, with mandatory 2FA. → [Panel over HTTPS](./panel-https), [Security](./security)
 
 **How do I upgrade?**
 Backup, then replace the binary or image. → [Upgrades and backup](./upgrades-backup)

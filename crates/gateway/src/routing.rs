@@ -51,20 +51,21 @@ pub fn normalize_path(raw: &str) -> Result<String, PathError> {
 
 /// Host dalla richiesta: `Host` in HTTP/1.1, authority in HTTP/2.
 pub fn request_host(parts: &http::request::Parts) -> Option<String> {
-    let raw = parts
-        .uri
-        .authority()
-        .map(|a| a.host().to_owned())
-        .or_else(|| {
-            let h = parts.headers.get(http::header::HOST)?.to_str().ok()?;
-            // togli la porta (attenzione agli IPv6 tra parentesi quadre)
-            let host = if h.starts_with('[') {
-                h.split(']').next().map(|s| format!("{s}]"))?
-            } else {
-                h.split(':').next()?.to_owned()
-            };
-            Some(host)
-        })?;
+    host_of(&parts.uri, &parts.headers)
+}
+
+/// L'host di una richiesta (senza porta, minuscolo), dall'URI o dall'header `Host`.
+pub fn host_of(uri: &http::Uri, headers: &http::HeaderMap) -> Option<String> {
+    let raw = uri.authority().map(|a| a.host().to_owned()).or_else(|| {
+        let h = headers.get(http::header::HOST)?.to_str().ok()?;
+        // togli la porta (attenzione agli IPv6 tra parentesi quadre)
+        let host = if h.starts_with('[') {
+            h.split(']').next().map(|s| format!("{s}]"))?
+        } else {
+            h.split(':').next()?.to_owned()
+        };
+        Some(host)
+    })?;
     normalize_host(&raw).ok()
 }
 

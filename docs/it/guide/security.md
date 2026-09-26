@@ -17,7 +17,7 @@ OtterRoute serve file di **sola lettura** da bucket privati. Chi lo visita non h
 
 ## Cosa devi fare tu
 
-1. **Non esporre la porta 9090.** Il pannello e `/metrics` sono pensati per `localhost`. Per lavorare da remoto usa un tunnel SSH o una VPN.
+1. **Non esporre la porta 9090.** Il pannello e `/metrics` sono pensati per `localhost`. Per lavorare da remoto usa un tunnel SSH o una VPN, oppure [servi il pannello in HTTPS](./panel-https) su un dominio dedicato con la 2FA obbligatoria. Con Docker pubblica la porta come `-p 127.0.0.1:9090:9090`, mai `-p 9090:9090`.
 2. **Chiavi con il minimo dei permessi.** Una chiave dedicata, di sola lettura, limitata al bucket (o alla cartella) pubblicato. → [Bucket S3](./buckets-s3)
 3. **HTTPS attivo**, perché HTTP in chiaro non protegge nulla in transito: [certificati automatici](./https) oppure [un proxy davanti](./https-proxy).
 4. **2FA obbligatoria** almeno per gli amministratori. → [Utenti, permessi e 2FA](./users-2fa)

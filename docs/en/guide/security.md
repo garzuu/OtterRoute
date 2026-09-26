@@ -20,7 +20,7 @@ OtterRoute serves **read-only** files from private buckets. Whoever visits has n
 
 ## What you have to do
 
-1. **Do not expose port 9090.** The panel and `/metrics` are meant for `localhost`. To work remotely use an SSH tunnel or a VPN.
+1. **Do not expose port 9090.** The panel and `/metrics` are meant for `localhost`. To work remotely use an SSH tunnel or a VPN, or [serve the panel over HTTPS](./panel-https) on a dedicated domain with mandatory 2FA. With Docker publish the port as `-p 127.0.0.1:9090:9090`, never `-p 9090:9090`.
 2. **Keys with minimum permissions.** A dedicated, read-only key limited to the published bucket (or folder). → [S3 buckets](./buckets-s3)
 3. **HTTPS enabled**, because plain HTTP protects nothing in transit: [automatic certificates](./https) or [a proxy in front](./https-proxy).
 4. **Mandatory 2FA** at least for administrators. → [Users, permissions and 2FA](./users-2fa)

@@ -242,12 +242,45 @@ for _ in $(seq 60); do curl -sf $ADMIN/healthz >/dev/null && break; sleep 0.1; d
 check "riavvio: il certificato si ricarica da disco" 200 "$(hs /barca.jpg)"
 rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"admin","password":"password-admin-1"}' >/dev/null
 
+echo "== pannello in HTTPS"
+sed 's/img.localhost/media.localhost/g' "$work/ssl.cnf" > "$work/ssl2.cnf"
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/k2.pem" -out "$work/c2.pem" -days 30 -config "$work/ssl2.cnf" >/dev/null 2>&1
+ah() { local b; b="$1"; code -X PUT $ADMIN/api/admin-host -d "$b"; }
+hsm() { curl -s --cacert "$work/c2.pem" --resolve media.localhost:$tp:127.0.0.1 "$@"; }
+check "pannello in HTTPS: dominio non censito" 404 "$(ah '{"host":"sconosciuto.example.com"}')"
+check "…dominio con instradamenti rifiutato" 422 "$(ah '{"host":"img.localhost"}')"
+check "…dominio senza certificato rifiutato" 422 "$(ah '{"host":"media.localhost"}')"
+check "carica il certificato di media.localhost" 200 "$(up media.localhost "$work/c2.pem" "$work/k2.pem")"
+r="$(api -X PUT $ADMIN/api/admin-host -d '{"host":"media.localhost"}')"
+check "attiva il pannello in HTTPS" media.localhost "$(jget "d['host']" <<<"$r")"
+check "…con l'avviso sulla 2FA" 1 "$(jget "len(d['warnings'])" <<<"$r")"
+check "…e l'indirizzo per raggiungerlo" "https://media.localhost:$tp/" "$(jget "d['url']" <<<"$r")"
+check "il pannello risponde in HTTPS (sessione)" false "$(hsm https://media.localhost:$tp/api/session | jget "str(d['authenticated']).lower()")"
+check "gli endpoint del pannello si servono in HTTPS (healthz)" 200 "$(hsm -o /dev/null -w '%{http_code}' https://media.localhost:$tp/healthz)"
+check "l'API senza login resta protetta" 401 "$(hsm -o /dev/null -w '%{http_code}' https://media.localhost:$tp/api/panel)"
+check "HTTP verso il dominio del pannello: 308" 308 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: media.localhost' "http://$GW/api/session")"
+check "…verso HTTPS con lo stesso percorso" "https://media.localhost:$tp/api/session" "$(curl -s -o /dev/null -D - -H 'Host: media.localhost' "http://$GW/api/session" | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')"
+check "le sfide ACME restano in HTTP (404, niente redirect)" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: media.localhost' "http://$GW/.well-known/acme-challenge/x")"
+check "la verifica del dominio resta in HTTP" 200 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: media.localhost' "http://$GW/.well-known/otterroute/check?nonce=a")"
+check "gli altri domini non cambiano" 200 "$(hs /barca.jpg)"
+lb='{"username":"admin","password":"password-admin-1"}'
+check "login via HTTPS: cookie Secure" 1 "$(hsm -c "$work/jar-tls" -D - -o /dev/null -H "$J" -d "$lb" https://media.localhost:$tp/api/login | tr -d '\r' | grep -ci '^set-cookie:.*; Secure')"
+check "…e la sessione vale in HTTPS" 200 "$(hsm -b "$work/jar-tls" -o /dev/null -w '%{http_code}' https://media.localhost:$tp/api/panel)"
+check "login sulla porta locale: cookie senza Secure" 0 "$(curl -s -o /dev/null -D - -H "$J" -d "$lb" $ADMIN/api/login | tr -d '\r' | grep -ci '^set-cookie:.*; Secure')"
+check "il pannello locale (9090) funziona ancora" 200 "$(curl -s -o /dev/null -w '%{http_code}' $ADMIN/healthz)"
+check "il dominio del pannello non si elimina" 409 "$(code -X DELETE $ADMIN/api/domains/media.localhost)"
+check "…né si aggiungono instradamenti" 422 "$(b="$(python3 -c 'import json,sys; print(json.dumps({"domain":"media.localhost","path_prefix":"/","bucket_id":sys.argv[1]}))' "$bid")"; code $ADMIN/api/rules -d "$b")"
+check "disattiva il pannello in HTTPS" None "$(api -X PUT $ADMIN/api/admin-host -d '{"host":null}' | jget "d['host']")"
+check "disattivato: il dominio torna un dominio normale (404)" 404 "$(hsm -o /dev/null -w '%{http_code}' https://media.localhost:$tp/api/session)"
+check "…e l'HTTP non reindirizza più" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: media.localhost' "http://$GW/api/session")"
+
 echo "== permessi"
 api $ADMIN/api/users -d '{"username":"lettore","role":"viewer","password":"password-lettore-1"}' >/dev/null
 rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"lettore","password":"password-lettore-1"}' >/dev/null
 api -X PUT $ADMIN/api/me/password -d '{"current":"password-lettore-1","new":"password-lettore-2"}' >/dev/null  # la temporanea va cambiata al primo accesso
 check "sola lettura: niente purge" 403 "$(b="$(pj rule "$rid")"; code $ADMIN/api/purge -d "$b")"
 check "sola lettura: può fare la diagnosi" 200 "$(b='{"url":"http://img.localhost/barca.jpg"}'; code $ADMIN/api/diagnose -d "$b")"
+check "sola lettura: non attiva il pannello in HTTPS" 403 "$(code -X PUT $ADMIN/api/admin-host -d '{"host":null}')"
 check "sola lettura: niente HTTPS automatico" 403 "$(b='{"enabled":true}'; code -X PUT $ADMIN/api/https -d "$b")"
 check "sola lettura: niente caricamento certificati" 403 "$(b='{"host":"img.localhost","chain":"x","key":"y"}'; code $ADMIN/api/certs/upload -d "$b")"
 check "sola lettura: niente redirect" 403 "$(b='{"host":"img.localhost","enabled":true}'; code $ADMIN/api/domains/redirect -d "$b")"

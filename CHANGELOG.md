@@ -4,6 +4,9 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e i
 
 ## [Non rilasciato]
 
+### Aggiunto
+- **Pannello in HTTPS**: il pannello si può servire anche su un dominio del nodo con il suo certificato (Impostazioni → Pannello in HTTPS), con redirect da HTTP, cookie `Secure` e la porta locale sempre attiva.
+
 ## [0.1.0] - 2026-09-26
 
 ### Aggiunto

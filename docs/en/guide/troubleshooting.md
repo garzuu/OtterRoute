@@ -46,7 +46,9 @@ Look for the message you see in the panel or in the response. If you cannot find
 | *too many attempts: try again in N minutes* | 5 errors in 5 minutes. | Wait. |
 | *wrong code* | Wrong or already used 2FA code, clock off. | Synchronize the phone's time; wait for the next code or use a recovery code. |
 | Lost password/2FA (last administrator) | — | `otterroute --reset-user NAME` on the node. |
-| The panel does not open | Port 9090 listens only on `127.0.0.1`. | Use an SSH tunnel: `ssh -L 9090:127.0.0.1:9090 server`. |
+| The panel does not open | Port 9090 listens only on `127.0.0.1`. | Use an SSH tunnel: `ssh -L 9090:127.0.0.1:9090 server`, or [serve it over HTTPS](./panel-https). |
+| The panel over HTTPS redirects forever | Cloudflare is on SSL **Flexible**: it talks to the node over HTTP. | Switch to **Full**. |
+| The panel over HTTPS does not open (TLS error or 525/521) | The domain's certificate is expired or missing, or port 443 is unreachable. | Recover from the local tunnel (Domains → HTTPS) and check the firewall. |
 | Login required again after restart | Sessions are in memory. | Normal. |
 
 ## Notifications
