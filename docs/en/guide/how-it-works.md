@@ -7,16 +7,7 @@ OtterRoute is a **read-only gateway** in front of one or more S3-compatible buck
 
 ## The path of a request
 
-```text
-visitor ──► DNS ──► [proxy / CDN / load balancer] ──► OtterRoute :80
-                                                          │
-                        1. host + path → route (longest prefix wins)
-                        2. fresh copy in cache?  ── yes ──► response (X-Cache: HIT)
-                                   │ no
-                        3. signed request (SigV4) to the bucket ──► S3
-                        4. the file reaches the visitor while it is written to cache
-                                                          (X-Cache: MISS)
-```
+<!--@include: @/diagrams/request-flow.en.svg-->
 
 1. **Routing.** The request host (`img.company.com`) and the start of the path (`/photos/`) select a *route*. If several rules match, the longest prefix wins, compared by whole segments: `/docs/` does not catch `/docsx/`.
 2. **Cache.** If a fresh copy exists on disk the response starts immediately. Expired copies are revalidated with the storage (`304`) and, if the storage does not answer, they can still be served for a while.
@@ -24,6 +15,8 @@ visitor ──► DNS ──► [proxy / CDN / load balancer] ──► OtterRou
 4. **Response.** The file is streamed while being saved to cache, without loading it in memory. The `X-Cache` header tells what happened: `HIT`, `MISS`, `STALE`, `REVALIDATED`, `BYPASS`.
 
 ## The parts of the system
+
+<!--@include: @/diagrams/architecture.en.svg-->
 
 | Part | Where | What it does |
 |---|---|---|

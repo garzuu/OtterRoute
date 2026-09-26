@@ -8,6 +8,8 @@ Every requested file is kept on disk. Later requests are served from disk withou
 ![The “Cache” section of a route's row: purge and warm](/screens/routes.jpg)
 <p class="shot-caption">The “Cache” section of a route's row: purge and warm · 26/09/2026</p>
 
+<!--@include: @/diagrams/cache-decision.en.svg-->
+
 ## What `X-Cache` says
 
 | Value | Meaning |

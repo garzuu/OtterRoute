@@ -19,5 +19,6 @@ cargo test --workspace            # include i controlli che confrontano la guida
 
 - **Commit**: [Conventional Commits](https://www.conventionalcommits.org/it/) (`feat(gateway): …`, `fix(web): …`, `docs: …`).
 - **Documentazione**: ogni pagina esiste in italiano (`docs/it`) e in inglese (`docs/en`) con le stesse sezioni; la CI controlla la parità. Se cambi un comportamento, aggiorna la guida nella stessa PR: i test `docs_check` falliscono se scope, variabili `OTR_*`, metriche o esempi di configurazione non corrispondono al codice.
+- **Diagrammi**: gli SVG della guida (`docs/diagrams/`) si generano con `python3 docs/scripts/diagrams.py`; modifica lo script e rigenera, non i file. Vale per italiano e inglese insieme.
 - **Permessi**: un nuovo endpoint dell'API va nella tabella `admin::access` con lo scope richiesto (un test controlla che nessuna route ne sia priva).
 - **Segreti**: mai in log, risposte dell'API o report.

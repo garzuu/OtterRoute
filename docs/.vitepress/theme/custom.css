@@ -33,3 +33,20 @@
 
 .vp-doc img[src*="screens/"] { width: 100%; border: 1px solid var(--vp-c-divider); border-radius: 10px; box-shadow: 0 6px 24px rgba(15, 37, 55, .08); margin: 18px 0 0; }
 .shot-caption { margin: 8px 0 20px; font-size: 13px; color: var(--vp-c-text-2); text-align: center; }
+
+/* diagrammi SVG in linea (docs/scripts/diagrams.py): seguono il tema chiaro/scuro */
+.dg { display: block; width: 100%; height: auto; margin: 22px 0; font-family: var(--vp-font-family-base); }
+.dg-box { fill: var(--vp-c-bg-soft); stroke: var(--vp-c-divider); stroke-width: 1.5; }
+.dg-soft { fill: var(--vp-c-bg-alt); stroke: var(--vp-c-divider); stroke-width: 1.5; }
+.dg-brand { fill: var(--vp-c-brand-soft); stroke: var(--vp-c-brand-1); stroke-width: 1.5; }
+.dg-brand2 { fill: var(--vp-c-bg); stroke: var(--vp-c-brand-1); stroke-width: 1.5; }
+.dg-good { fill: var(--vp-c-green-soft); stroke: var(--vp-c-green-1); stroke-width: 1.5; }
+.dg-warn { fill: var(--vp-c-yellow-soft); stroke: var(--vp-c-yellow-1); stroke-width: 1.5; }
+.dg-bad { fill: var(--vp-c-red-soft); stroke: var(--vp-c-red-1); stroke-width: 1.5; }
+.dg-t { fill: var(--vp-c-text-1); font-size: 16px; font-weight: 600; }
+.dg-m { fill: var(--vp-c-text-2); font-size: 13.5px; }
+.dg-l { fill: var(--vp-c-text-1); font-size: 14px; font-weight: 500; }
+.dg-h { fill: var(--vp-c-brand-1); font-size: 15px; font-weight: 600; }
+.dg-line { stroke: var(--vp-c-text-2); stroke-width: 1.6; }
+.dg-head { fill: var(--vp-c-text-2); }
+@media (max-width: 640px) { .dg-t { font-size: 18px; } .dg-m, .dg-l { font-size: 15px; } }
