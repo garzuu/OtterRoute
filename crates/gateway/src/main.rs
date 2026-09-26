@@ -15,6 +15,7 @@ mod duration;
 mod handler;
 mod imgx;
 mod metrics;
+mod metrics_extra;
 mod notify;
 mod panel;
 mod routing;
@@ -266,6 +267,7 @@ async fn main() -> anyhow::Result<()> {
     // prima di creare l'Updater: legge lo stato dal file, che qui si aggiorna
     if let Some(from) = update::note_startup(&args.state_dir, update::CURRENT, update::now_pub()) {
         tracing::info!(da = %from, a = update::CURRENT, "versione aggiornata");
+        metrics_extra::inc(&metrics_extra::C.update_applied);
         audit::log("update.applied", &format!("{from} → {}", update::CURRENT));
     }
     let updater = Arc::new(

@@ -599,9 +599,41 @@ fn status(admin: &Admin) -> Response<Body> {
 /// Formato Prometheus, sulla porta admin (solo locale) e senza login, come `/status`.
 fn prometheus(admin: &Admin) -> Response<Body> {
     let s = &admin.state;
-    let text = s
+    let mut text = s
         .metrics
         .render_prometheus(&s.cache.stats(), s.snapshot.load().version);
+    let now = sign::now_secs();
+    let certs: Vec<(String, crate::tls::CertInfo, bool)> = panel::load(&admin.state_dir)
+        .map(|p| {
+            p.domains
+                .iter()
+                .filter(|d| crate::acme::certifiable(&d.host) || s.tls.store.has(&d.host))
+                .map(|d| {
+                    (
+                        d.host.clone(),
+                        crate::tls::read_info(&admin.state_dir, &d.host),
+                        s.tls.store.has(&d.host),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let u = admin.updater.view(true, false);
+    text.push_str(&crate::metrics_extra::render(
+        &crate::metrics_extra::Snapshot {
+            version: crate::update::CURRENT,
+            install: match admin.updater.kind {
+                crate::update::Kind::Docker => "docker",
+                crate::update::Kind::Service => "service",
+                crate::update::Kind::Binary => "binary",
+                crate::update::Kind::Source => "source",
+            },
+            certs: &certs,
+            update_available: u["available"].as_bool().unwrap_or(false),
+            update_checked_at: u["checked_at"].as_u64().unwrap_or(0),
+            now,
+        },
+    ));
     let mut r = Response::new(body::full(text));
     r.headers_mut().insert(
         header::CONTENT_TYPE,

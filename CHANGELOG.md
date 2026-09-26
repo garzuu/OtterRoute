@@ -2,6 +2,7 @@
 
 ### Aggiunto
 - **Indirizzi ammessi per il pannello in HTTPS**: elenco di IP e reti CIDR (Impostazioni → Pannello in HTTPS, `PUT /api/admin-allow`); gli altri ricevono 404, la porta locale resta sempre aperta e dal pannello HTTPS non ci si può escludere da soli.
+- **Metriche Prometheus** per immagini al volo, link firmati, certificati (scadenza e stato di servizio), emissioni ACME, controlli e aggiornamenti, più `otterroute_build_info`. Query e allarmi di esempio nella guida.
 
 ## [0.1.1] - 2026-09-26
 
