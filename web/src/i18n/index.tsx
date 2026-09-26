@@ -37,6 +37,15 @@ export function tr(key: Key, p?: Params): string {
   return fill(DICTS[current][key] ?? it[key] ?? key, p);
 }
 
+/** Testo con <b>…</b> e <code>…</code> in nodi React, senza HTML grezzo. */
+export function rich(text: string): ReactNode[] {
+  return text.split(/(<b>.*?<\/b>|<code>.*?<\/code>)/g).map((part, i) => {
+    const m = /^<(b|code)>(.*)<\/\1>$/.exec(part);
+    if (!m) return part;
+    return m[1] === "b" ? <strong key={i}>{m[2]}</strong> : <code key={i}>{m[2]}</code>;
+  });
+}
+
 /** Plurali: cerca `<chiave>.one` / `<chiave>.other` secondo la lingua; `{n}` è il numero. */
 export function trn(key: string, n: number, p?: Params): string {
   const cat = new Intl.PluralRules(LOCALES[current]).select(n) === "one" ? "one" : "other";
