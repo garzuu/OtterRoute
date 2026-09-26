@@ -341,13 +341,24 @@ where
 
 // --- rinnovo ---------------------------------------------------------------------
 
-/// Giorni prima della scadenza in cui si rinnova.
+/// Quanto prima della scadenza si rinnova, al massimo.
 pub const RENEW_BEFORE_SECS: u64 = 30 * 24 * 3600;
+/// Da quanto prima della scadenza lo stato diventa "in scadenza", al massimo.
+const EXPIRING_SECS: u64 = 14 * 24 * 3600;
+
+/// Le finestre si accorciano per i certificati di breve durata: non si può rinnovare
+/// a 30 giorni dalla scadenza un certificato che ne dura 6, o si rinnoverebbe a ogni giro.
+fn window(info: &CertInfo, max: u64) -> u64 {
+    match (info.issued_at, info.not_after) {
+        (Some(from), Some(to)) if to > from => max.min((to - from) / 3),
+        _ => max,
+    }
+}
 
 pub fn needs_issue(info: &CertInfo, has_loaded: bool, now: u64) -> bool {
     match info.not_after {
         None => true,
-        Some(na) => !has_loaded || na.saturating_sub(now) < RENEW_BEFORE_SECS,
+        Some(na) => !has_loaded || na.saturating_sub(now) < window(info, RENEW_BEFORE_SECS),
     }
 }
 
@@ -357,7 +368,7 @@ pub fn status(info: &CertInfo, now: u64) -> &'static str {
         None if info.error.is_some() => "error",
         None => "missing",
         Some(na) if na <= now => "expired",
-        Some(na) if na - now < 14 * 24 * 3600 => "expiring",
+        Some(na) if na - now < window(info, EXPIRING_SECS) => "expiring",
         Some(_) => "valid",
     }
 }
@@ -442,6 +453,27 @@ mod tests {
         assert!(
             !safe_host("a/b") && !safe_host("") && !safe_host(".x") && safe_host("a-b.example.com")
         );
+    }
+
+    #[test]
+    fn short_lived_certificates_do_not_renew_in_a_loop() {
+        let info = |lifetime_days: u64| CertInfo {
+            host: "a.example.com".into(),
+            issued_at: Some(1_000_000),
+            not_after: Some(1_000_000 + lifetime_days * 86400),
+            error: None,
+        };
+        let at = |days_since_issue: u64| 1_000_000 + days_since_issue * 86400;
+        // 90 giorni: come prima (rinnovo a 30 giorni dalla scadenza, "in scadenza" a 14)
+        assert!(!needs_issue(&info(90), true, at(59)) && needs_issue(&info(90), true, at(61)));
+        assert_eq!(status(&info(90), at(60)), "valid");
+        assert_eq!(status(&info(90), at(77)), "expiring");
+        // 6 giorni: si rinnova solo nell'ultimo terzo, e non è "in scadenza" appena emesso
+        assert_eq!(status(&info(6), at(0)), "valid");
+        assert!(!needs_issue(&info(6), true, at(1)));
+        assert!(needs_issue(&info(6), true, at(5)));
+        assert_eq!(status(&info(6), at(5)), "expiring");
+        assert_eq!(status(&info(6), at(7)), "expired");
     }
 
     #[test]

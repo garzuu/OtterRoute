@@ -143,6 +143,7 @@ export interface RuleInfo {
   folder: string;
   cache_generation: number;
   signed: boolean;
+  images: boolean;
 }
 
 export interface LiveRoute {
@@ -363,8 +364,8 @@ export const api = {
     post<{ host: string; not_after: number }>("/api/certs/upload", { host, chain, key }),
   setRedirect: (host: string, enabled: boolean) =>
     post<{ host: string; redirect_https: boolean }>("/api/domains/redirect", { host, enabled }),
-  setRuleSigned: (id: string, signed: boolean) =>
-    request<{ id: string; signed: boolean }>(`/api/rules/${encodeURIComponent(id)}`, "PUT", { signed }),
+  setRuleOptions: (id: string, o: { signed?: boolean; images?: boolean }) =>
+    request<{ id: string; signed: boolean; images: boolean }>(`/api/rules/${encodeURIComponent(id)}`, "PUT", o),
   createLink: (b: { rule: string; path: string; ttl_secs: number; https?: boolean }) =>
     post<{ url: string; expires_at: number }>("/api/links", b),
   rotateLinks: () => post<{ ok: boolean }>("/api/links/rotate"),

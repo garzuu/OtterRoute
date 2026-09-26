@@ -19,6 +19,7 @@ I sorgenti della guida sono in [`docs/`](docs/).
 ## In breve
 
 - **Instradamento** per host e prefisso di percorso, più bucket con credenziali separate.
+- **Immagini al volo** (ridimensionamento e WebP) e **link firmati** con scadenza, per instradamento.
 - **Sola lettura** (`GET`/`HEAD`), firma SigV4, cache su disco con una sola richiesta allo storage per oggetto.
 - **Pannello** su `127.0.0.1:9090`: domini verificati davvero (DNS + richiesta al nodo), bucket, instradamenti, statistiche, utenti con permessi e 2FA, registro attività.
 - **Notifiche** email (SMTP) e Telegram quando un dominio o un bucket va in errore, e quando rientra.

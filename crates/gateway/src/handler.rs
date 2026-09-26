@@ -19,6 +19,7 @@ use crate::cache::{Cache, CacheWriter, Entry, FillGuard, FillRole};
 use crate::config::{CachePolicy, Route, Snapshot};
 use crate::routing::{cache_key, cache_query, normalize_path, request_host};
 use crate::s3::{self, Fetch};
+use sha2::Digest;
 
 /// Quanto aspetta una richiesta se lo stesso oggetto è già in download.
 const COALESCE_WAIT: Duration = Duration::from_secs(5);
@@ -280,6 +281,21 @@ async fn handle_inner(
     {
         return Err(HttpError(StatusCode::FORBIDDEN, "forbidden"));
     }
+    // immagini al volo: solo per gli instradamenti che lo chiedono e per file immagine
+    if route.images {
+        match crate::imgx::parse(parts.uri.query()) {
+            Err(_) => {
+                return Err(HttpError(
+                    StatusCode::BAD_REQUEST,
+                    "invalid image parameters",
+                ))
+            }
+            Ok(Some(p)) if crate::imgx::is_image_key(&key) => {
+                return serve_variant(state, &route, &key, p, parts).await;
+            }
+            Ok(_) => {}
+        }
+    }
     let ck = cache_key(
         &route,
         &key,
@@ -313,6 +329,163 @@ async fn handle_inner(
             passthrough(&route, &key, &parts.method, &ctx, stale).await
         }
         FillRole::Leader(guard) => fetch_and_fill(state, route, key, ck, ctx, stale, guard).await,
+    }
+}
+
+// --- immagini al volo -----------------------------------------------------------
+
+/// Trasformazioni contemporanee: sono lavoro di CPU, non vanno lasciate crescere.
+fn image_slots() -> &'static tokio::sync::Semaphore {
+    static SEM: std::sync::OnceLock<tokio::sync::Semaphore> = std::sync::OnceLock::new();
+    SEM.get_or_init(|| {
+        let n = std::thread::available_parallelism().map_or(2, std::num::NonZero::get);
+        tokio::sync::Semaphore::new((n / 2).clamp(1, 4))
+    })
+}
+
+const IMAGE_TIMEOUT: Duration = Duration::from_secs(30);
+const UNPROCESSABLE: HttpError =
+    HttpError(StatusCode::UNPROCESSABLE_ENTITY, "cannot process image");
+const TOO_LARGE: HttpError = HttpError(
+    StatusCode::PAYLOAD_TOO_LARGE,
+    "image too large to transform",
+);
+const BUSY: HttpError = HttpError(StatusCode::SERVICE_UNAVAILABLE, "busy");
+
+/// L'originale in memoria: dalla cache se c'è, altrimenti dallo storage (e lo si salva).
+async fn load_original(
+    state: &Arc<AppState>,
+    route: &Route,
+    key: &str,
+) -> Result<Vec<u8>, HttpError> {
+    let cap = crate::imgx::MAX_SOURCE_BYTES;
+    let ck = cache_key(route, key, "");
+    if let Some(mut e) = state.cache.lookup(&ck).await {
+        if e.meta.status == 200 && e.meta.size <= cap {
+            if let Some(mut f) = e.file.take() {
+                let mut buf = Vec::with_capacity(e.meta.size as usize);
+                if f.read_to_end(&mut buf).await.is_ok() && buf.len() as u64 == e.meta.size {
+                    return Ok(buf);
+                }
+            }
+        }
+    }
+    let d = &route.dest;
+    match s3::fetch(&d.storage, &d.bucket, key, &Method::GET, &[]).await {
+        Fetch::Ok(resp) if resp.status() == StatusCode::OK => {
+            if resp.content_length().is_some_and(|l| l > cap) {
+                return Err(TOO_LARGE);
+            }
+            let headers = forwarded(resp.headers());
+            let mut buf: Vec<u8> = Vec::new();
+            let mut stream = resp.bytes_stream();
+            while let Some(chunk) = stream.next().await {
+                let chunk = chunk.map_err(|_| BAD_GATEWAY)?;
+                if buf.len() as u64 + chunk.len() as u64 > cap {
+                    return Err(TOO_LARGE);
+                }
+                buf.extend_from_slice(&chunk);
+            }
+            // salva anche l'originale: altre dimensioni dello stesso file non lo riscaricano
+            if buf.len() as u64 <= state.max_object_bytes {
+                if let Ok(mut w) = state.cache.writer(&ck).await {
+                    if w.write(&buf).await.is_ok() {
+                        let _ = w.commit(&state.cache, 200, headers).await;
+                    } else {
+                        w.abort().await;
+                    }
+                }
+            }
+            Ok(buf)
+        }
+        Fetch::NotFound => Err(NOT_FOUND),
+        Fetch::Misconfigured(msg) => {
+            crate::metrics::note_upstream_error(&d.storage.id);
+            tracing::error!(route = %route.id, %msg, "storage rifiuta le credenziali");
+            Err(BAD_GATEWAY)
+        }
+        _ => {
+            crate::metrics::note_upstream_error(&d.storage.id);
+            Err(BAD_GATEWAY)
+        }
+    }
+}
+
+/// Una variante di immagine: dalla cache, oppure generata e salvata al primo accesso.
+async fn serve_variant(
+    state: &Arc<AppState>,
+    route: &Arc<Route>,
+    key: &str,
+    p: crate::imgx::Params,
+    parts: &http::request::Parts,
+) -> Result<Response<Body>, HttpError> {
+    let accept = parts
+        .headers
+        .get(header::ACCEPT)
+        .and_then(|v| v.to_str().ok());
+    let out = crate::imgx::resolve(&p, key, accept);
+    let ck = cache_key(route, key, &crate::imgx::canonical(&p, out));
+    let ctx = Ctx::from_headers(&parts.method, &parts.headers);
+
+    if let Some(e) = state.cache.lookup(&ck).await {
+        if e.meta.status == 200 && e.is_fresh(&route.policy) {
+            return serve_cached(e, &ctx, &route.policy, "HIT").await;
+        }
+    }
+    let guard = match state.cache.begin_fill(&ck) {
+        FillRole::Follower(mut rx) => {
+            let _ = tokio::time::timeout(IMAGE_TIMEOUT, rx.changed()).await;
+            return match state.cache.lookup(&ck).await {
+                Some(e) if e.meta.status == 200 && e.is_fresh(&route.policy) => {
+                    serve_cached(e, &ctx, &route.policy, "HIT").await
+                }
+                _ => Err(BUSY),
+            };
+        }
+        FillRole::Leader(g) => g,
+    };
+    let original = load_original(state, route, key).await?;
+    let permit = image_slots().acquire().await.map_err(|_| BUSY)?;
+    let job = tokio::task::spawn_blocking(move || crate::imgx::transform(&original, &p, out));
+    let done = tokio::time::timeout(IMAGE_TIMEOUT, job).await;
+    drop(permit);
+    let bytes = match done {
+        Ok(Ok(Ok(b))) => b,
+        Ok(Ok(Err(msg))) => {
+            tracing::warn!(route = %route.id, %key, %msg, "immagine non trasformabile");
+            return Err(UNPROCESSABLE);
+        }
+        _ => {
+            tracing::warn!(route = %route.id, %key, "trasformazione interrotta o scaduta");
+            return Err(BUSY);
+        }
+    };
+    let mut headers = vec![
+        ("content-type".to_string(), out.content_type().to_string()),
+        (
+            "etag".to_string(),
+            format!("\"{}\"", hex::encode(&sha2::Sha256::digest(&bytes)[..8])),
+        ),
+    ];
+    if p.fmt == crate::imgx::Want::Auto {
+        headers.push(("vary".to_string(), "Accept".to_string()));
+    }
+    match state.cache.writer(&ck).await {
+        Ok(mut w) if bytes.len() as u64 <= state.max_object_bytes => {
+            if w.write(&bytes).await.is_ok() {
+                if let Err(e) = w.commit(&state.cache, 200, headers).await {
+                    tracing::warn!(error = %e, "variante non salvata");
+                }
+            } else {
+                w.abort().await;
+            }
+        }
+        _ => {}
+    }
+    drop(guard);
+    match state.cache.lookup(&ck).await {
+        Some(e) => serve_cached(e, &ctx, &route.policy, "MISS").await,
+        None => Err(BAD_GATEWAY),
     }
 }
 

@@ -55,7 +55,12 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
       key: "access",
       header: "Accesso",
       sort: (x) => (x.signed ? "1" : "0"),
-      render: (x) => (x.signed ? <span className="badge warn">Link firmati</span> : <span className="badge">Pubblico</span>),
+      render: (x) => (
+        <>
+          {x.signed ? <span className="badge warn">Link firmati</span> : <span className="badge">Pubblico</span>}{" "}
+          {x.images && <span className="badge good">Immagini</span>}
+        </>
+      ),
     },
     {
       key: "domain",
@@ -299,7 +304,7 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
 
   return (
     <div className="details">
-      <strong>Link firmati</strong>
+      <strong>Accesso e immagini</strong>
       <label className="check">
         <input
           type="checkbox"
@@ -307,7 +312,7 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
           disabled={busy}
           onChange={(e) =>
             run(async () => {
-              await api.setRuleSigned(r.id, e.target.checked);
+              await api.setRuleOptions(r.id, { signed: e.target.checked });
               setLink(null);
               await props.refresh();
             })
@@ -315,6 +320,22 @@ function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
         />
         <span>
           I file di questo instradamento si aprono solo con un <strong>link firmato e con scadenza</strong>. Senza, il nodo risponde 403 (anche per i file già in cache).
+        </span>
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={r.images}
+          disabled={busy}
+          onChange={(e) =>
+            run(async () => {
+              await api.setRuleOptions(r.id, { images: e.target.checked });
+              await props.refresh();
+            })
+          }
+        />
+        <span>
+          <strong>Immagini al volo</strong>: i file JPEG, PNG, GIF e WebP si ridimensionano e si convertono con <code>?w=800&amp;h=600&amp;fit=cover&amp;fmt=webp&amp;q=80</code> (<code>fmt=auto</code> sceglie WebP se il browser lo accetta). Le varianti restano in cache; l’originale non si modifica.
         </span>
       </label>
       {r.signed && (

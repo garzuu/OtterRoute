@@ -93,6 +93,7 @@ Una sola tra le due forme:
 | `strip_prefix` | `true` | Toglie il prefisso prima di cercare il file. |
 | `destination` | — | `id` di una destinazione. |
 | `cache_policy` | — | `id` di una politica. |
+| `image_transform` | `false` | Ridimensiona e converte le [immagini al volo](/guide/images) (`?w=&h=&fit=&fmt=&q=`). |
 | `signed_urls` | `false` | Serve i file solo con un [link firmato](/guide/signed-links) (`?exp=&sig=`); la chiave sta nel file `secrets/_signing.json` dello stato. |
 
 Le durate: `30s`, `5m`, `1h`, `24h`, `7d`.

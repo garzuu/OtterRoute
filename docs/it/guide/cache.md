@@ -49,7 +49,7 @@ Da **Instradamenti**, espandi la riga di un instradamento: nella sezione **Cache
 | **Svuota tutto** | Svuota la cache dell'instradamento con un click e una conferma. Non cancella nulla dal disco: aumenta il `cache_generation` dell'instradamento, quindi le vecchie copie diventano irraggiungibili e l'LRU le elimina. |
 | **Precarica** | Elenca fino a 200 file, uno per riga: il nodo li richiede da solo, uno alla volta, così la prima visita è già `HIT`. Per ogni file vedi stato, `X-Cache`, byte e tempo. Il precaricamento si interrompe dopo 2 minuti; i file rimasti sono segnalati come non eseguiti. |
 
-Svuotare non elimina il file dallo storage né dalle eventuali cache davanti al nodo (CDN, browser): quelle hanno i loro tempi.
+Se l'instradamento ha le [immagini al volo](./images), *Svuota file* rimuove solo l'originale: le varianti scadono da sole o si eliminano con *Svuota tutto*. Svuotare non elimina il file dallo storage né dalle eventuali cache davanti al nodo (CDN, browser): quelle hanno i loro tempi.
 
 Nella configurazione a mano lo stesso effetto si ottiene aumentando `cache_generation` di una destinazione.
 

@@ -33,6 +33,7 @@ export const sections: Section[] = [
       { slug: "guide/domains-dns", it: "Domini e DNS", en: "Domains and DNS" },
       { slug: "guide/buckets-s3", it: "Bucket S3", en: "S3 buckets" },
       { slug: "guide/routes", it: "Instradamenti", en: "Routes" },
+      { slug: "guide/images", it: "Immagini al volo", en: "Images on the fly" },
       { slug: "guide/signed-links", it: "Link firmati", en: "Signed links" },
       { slug: "guide/cache", it: "Cache", en: "Cache" },
     ],

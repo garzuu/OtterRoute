@@ -1669,6 +1669,7 @@ async fn add_rule(admin: &Admin, req: RuleReq) -> Response<Body> {
         folder,
         cache_generation: 1,
         signed: req.signed,
+        images: false,
     };
     p.rules.push(rule.clone());
     if let Err(e) = apply_config(admin, &p) {
@@ -1726,9 +1727,13 @@ fn own_query(admin: &Admin, host: &str, path: &str) -> String {
     )
 }
 
+/// Opzioni di un instradamento modificabili dopo la creazione (quelle assenti restano come sono).
 #[derive(Deserialize)]
 struct RuleSignedReq {
-    signed: bool,
+    #[serde(default)]
+    signed: Option<bool>,
+    #[serde(default)]
+    images: Option<bool>,
 }
 
 async fn set_rule_signed(admin: &Admin, id: &str, req: RuleSignedReq) -> Response<Body> {
@@ -1743,10 +1748,20 @@ async fn set_rule_signed(admin: &Admin, id: &str, req: RuleSignedReq) -> Respons
     let Some(rule) = p.rules.iter_mut().find(|r| r.id == id) else {
         return error(StatusCode::NOT_FOUND, "instradamento non trovato");
     };
-    rule.signed = req.signed;
-    // i file già in cache non devono restare accessibili senza link (né viceversa)
+    if req.signed.is_none() && req.images.is_none() {
+        return bad("nessuna opzione da modificare");
+    }
+    if let Some(s) = req.signed {
+        rule.signed = s;
+    }
+    if let Some(i) = req.images {
+        rule.images = i;
+    }
+    // le copie già in cache non devono restare accessibili senza link (né viceversa)
+    // e le varianti di immagine di un'impostazione precedente non hanno più senso
     rule.cache_generation += 1;
     let label = format!("{}{}", rule.domain, rule.path_prefix);
+    let (signed, images) = (rule.signed, rule.images);
     if let Err(e) = apply_config(admin, &p) {
         return error(StatusCode::INTERNAL_SERVER_ERROR, e);
     }
@@ -1754,17 +1769,17 @@ async fn set_rule_signed(admin: &Admin, id: &str, req: RuleSignedReq) -> Respons
         return r;
     }
     audit::log(
-        "rule.signed",
+        "rule.options",
         &format!(
-            "{label} · {}",
-            if req.signed {
-                "link firmati"
-            } else {
-                "pubblico"
-            }
+            "{label} · {} · immagini {}",
+            if signed { "link firmati" } else { "pubblico" },
+            if images { "al volo" } else { "originali" }
         ),
     );
-    json(StatusCode::OK, json!({ "id": id, "signed": req.signed }))
+    json(
+        StatusCode::OK,
+        json!({ "id": id, "signed": signed, "images": images }),
+    )
 }
 
 #[derive(Deserialize)]

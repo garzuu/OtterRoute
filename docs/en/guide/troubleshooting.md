@@ -33,6 +33,8 @@ Look for the message you see in the panel or in the response. If you cannot find
 | A correct file still gives `404` | Negative cache (60 seconds). | Wait a minute. |
 | The file does not update | The copy is still fresh (1 hour). | Wait, or increase `cache_generation` ([Cache](./cache)). |
 | `403` with `?exp=&sig=` in the address | The route requires [signed links](./signed-links) and the link is expired, tampered with or issued with a key that was later rotated. | Create a new link; the [Diagnosis](./diagnosis) page says which of the three it is. |
+| `400` with `?w=` or `?fmt=` | A parameter of [images on the fly](./images) is not valid (`w`/`h` 1–4096, `q` 30–95, `fmt` webp/jpeg/png/auto). | Fix the value. |
+| `422` on an image | The file is not a valid image, is damaged or exceeds the limits (64 million pixels). | Check the original in the storage. |
 | `405` / `400` | The gateway accepts only `GET` and `HEAD` (405); paths with `..` or control characters are rejected (400). | Use a normal path. |
 | `X-Cache: STALE` | The storage does not answer and an expired copy is served. | Restore the storage. |
 

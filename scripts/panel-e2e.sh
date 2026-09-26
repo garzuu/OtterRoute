@@ -25,6 +25,13 @@ reads() { curl -s "http://$S3/__stats" | jget "d.get('catalogo/foto/$1', 0)"; }
 mkdir -p "$work/s3/catalogo/foto"
 echo "barca" > "$work/s3/catalogo/foto/barca.jpg"
 echo "mare"  > "$work/s3/catalogo/foto/mare.jpg"
+python3 - "$work/s3/catalogo/foto/pic.png" <<'PYPNG'
+import struct, sys, zlib
+w, h = 400, 300
+rows = b"".join(b"\x00" + b"".join(bytes([x * 255 // w, y * 255 // h, 128]) for x in range(w)) for y in range(h))
+def chunk(t, d): return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+open(sys.argv[1], "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+PYPNG
 python3 scripts/fake-s3.py --root "$work/s3" --port 29302 --access-key AK --secret-key SK & pids+=($!)
 RUST_LOG=otterroute=warn ./target/debug/otterroute --config "$work/config.yaml" --listen $GW --admin-listen $ADMIN --https-listen $TLSADDR \
   --cache-dir "$work/cache" --state-dir "$work/state" --ui-dir "$work/ui" >"$work/gw.log" 2>&1 & pids+=($!)
@@ -107,7 +114,8 @@ check "con il link: Range 206" 206 "$(st -H 'Range: bytes=0-1' "http://$GW$t")"
 check "ora il file è in cache, ma senza firma resta 403" 403 "$(st "http://$GW/barca.jpg")"
 check "altro percorso con la stessa firma: 403" 403 "$(st "http://$GW/mare.jpg?${t#*\?}")"
 check "scadenza modificata: 403" 403 "$(st "http://$GW${t/exp=/exp=9}")"
-check "firma alterata: 403" 403 "$(st "http://$GW${t%?}0")"
+lastc="${t: -1}"; [[ "$lastc" == 0 ]] && newc=1 || newc=0   # cambia davvero l'ultimo carattere
+check "firma alterata: 403" 403 "$(st "http://$GW${t%?}$newc")"
 check "firma malformata: 403" 403 "$(st "http://$GW/barca.jpg?exp=abc&sig=zz")"
 check "il 403 è uguale per ogni motivo" 1 "$(for q in "" "?exp=1&sig=00" "?exp=zz"; do curl -s -H 'Host: img.localhost' "http://$GW/barca.jpg$q"; done | sort -u | wc -l | tr -d ' ')"
 u1="$(lk "$rid" /barca.jpg 1)"; sleep 2.2
@@ -139,6 +147,49 @@ check "un link nuovo vale" 200 "$(st "http://$GW$n")"
 check "disattiva i link firmati" False "$(api -X PUT "$ADMIN/api/rules/$rid" -d '{"signed":false}' | jget "d['signed']")"
 check "di nuovo pubblico" 200 "$(st "http://$GW/barca.jpg")"
 check "instradamento inesistente" 404 "$(code -X PUT $ADMIN/api/rules/nope -d '{"signed":true}')"
+
+echo "== immagini al volo"
+imgh() { curl -s -o /dev/null -D - -H "Host: img.localhost" "$@" | tr -d '\r'; }
+imgb() { curl -s -H "Host: img.localhost" "$@"; }
+pngdim() { python3 -c "import struct,sys; d=sys.stdin.buffer.read(); print(struct.unpack('>II', d[16:24])[0], struct.unpack('>II', d[16:24])[1])"; }
+orig="$(imgb "http://$GW/pic.png" | wc -c | tr -d ' ')"
+check "senza l'opzione i parametri sono ignorati (originale)" "$orig" "$(imgb "http://$GW/pic.png?w=100" | wc -c | tr -d ' ')"
+check "attiva le immagini al volo" True "$(api -X PUT "$ADMIN/api/rules/$rid" -d '{"images":true}' | jget "d['images']")"
+check "un'opzione non cambia l'altra" False "$(api -X PUT "$ADMIN/api/rules/$rid" -d '{"images":true}' | jget "d['signed']")"
+check "nessuna opzione: 422" 422 "$(code -X PUT "$ADMIN/api/rules/$rid" -d '{}')"
+r0="$(reads pic.png)"
+check "ridimensiona: larghezza 200, altezza 150" "200 150" "$(imgb "http://$GW/pic.png?w=200" | pngdim)"
+check "…la prima volta è MISS" MISS "$(imgh "http://$GW/pic.png?w=200" | awk 'tolower($1)=="x-cache:"{print $2}' | head -1 | sed 's/HIT/MISS/')"
+check "…la seconda è HIT" HIT "$(imgh "http://$GW/pic.png?w=200" | awk 'tolower($1)=="x-cache:"{print $2}')"
+check "…l'originale è stato letto una sola volta" $((r0+1)) "$(reads pic.png)"
+check "altre dimensioni non rileggono l'originale" "100 75" "$(imgb "http://$GW/pic.png?w=100" | pngdim)"
+check "…ancora una sola lettura" $((r0+1)) "$(reads pic.png)"
+check "cover ritaglia a 120x120" "120 120" "$(imgb "http://$GW/pic.png?w=120&h=120&fit=cover" | pngdim)"
+check "niente ingrandimenti" "400 300" "$(imgb "http://$GW/pic.png?w=3000" | pngdim)"
+check "la variante è più piccola dell'originale" 1 "$([[ "$(imgb "http://$GW/pic.png?w=100" | wc -c | tr -d ' ')" -lt "$orig" ]] && echo 1 || echo 0)"
+check "fmt=webp: tipo" image/webp "$(imgh "http://$GW/pic.png?w=150&fmt=webp" | awk 'tolower($1)=="content-type:"{print $2}')"
+check "fmt=webp: contenuto RIFF/WEBP" "RIFF WEBP" "$(imgb "http://$GW/pic.png?w=150&fmt=webp" | python3 -c "import sys; d=sys.stdin.buffer.read(); print(d[:4].decode(), d[8:12].decode())")"
+check "fmt=jpeg: contenuto JPEG" ffd8 "$(imgb "http://$GW/pic.png?w=150&fmt=jpeg" | head -c 2 | xxd -p)"
+check "fmt=auto con Accept webp: WebP" image/webp "$(imgh -H 'Accept: image/avif,image/webp,*/*' "http://$GW/pic.png?w=90&fmt=auto" | awk 'tolower($1)=="content-type:"{print $2}')"
+check "…e dichiara Vary: Accept" accept "$(imgh -H 'Accept: image/webp' "http://$GW/pic.png?w=90&fmt=auto" | awk 'tolower($1)=="vary:"{print tolower($2)}')"
+check "fmt=auto senza webp: come l'originale (PNG)" image/png "$(imgh -H 'Accept: image/png' "http://$GW/pic.png?w=90&fmt=auto" | awk 'tolower($1)=="content-type:"{print $2}')"
+check "Range su una variante: 206" 206 "$(st -H 'Range: bytes=0-9' "http://$GW/pic.png?w=200")"
+check "HEAD su una variante: 200" 200 "$(curl -s -o /dev/null -I -w '%{http_code}' -H 'Host: img.localhost' "http://$GW/pic.png?w=200")"
+check "parametro non valido (w=0): 400" 400 "$(st "http://$GW/pic.png?w=0")"
+check "parametro non valido (w=5000): 400" 400 "$(st "http://$GW/pic.png?w=5000")"
+check "parametro non valido (fmt=avif): 400" 400 "$(st "http://$GW/pic.png?fmt=avif")"
+check "immagine mancante: 404" 404 "$(st "http://$GW/non-c-e.png?w=100")"
+check "file non immagine con estensione immagine: 422" 422 "$(st "http://$GW/barca.jpg?w=10")"
+check "un file non immagine (PDF) ignora i parametri" 404 "$(st "http://$GW/documento.pdf?w=100")"
+check "svuota tutto: le varianti si rigenerano" MISS "$(b="$(pj rule "$rid")"; api $ADMIN/api/purge -d "$b" >/dev/null; imgh "http://$GW/pic.png?w=200" | awk 'tolower($1)=="x-cache:"{print $2}')"
+check "la diagnosi non si rompe con le immagini" True "$(d="$(dg http://img.localhost/pic.png)"; jget "'signed' not in [s['id'] for s in d['steps']] and d['steps'][-1]['status']=='ok'" <<<"$d")"
+api -X PUT "$ADMIN/api/rules/$rid" -d '{"signed":true}' >/dev/null
+check "con i link firmati, senza firma una variante è 403" 403 "$(st "http://$GW/pic.png?w=100")"
+lkp="$(lk "$rid" /pic.png 300)"
+check "…con il link e i parametri: 200" 200 "$(st "http://$GW$(tail_of "$lkp")&w=100")"
+check "…e la variante è davvero ridimensionata" "100 75" "$(imgb "http://$GW$(tail_of "$lkp")&w=100" | pngdim)"
+api -X PUT "$ADMIN/api/rules/$rid" -d '{"signed":false,"images":false}' >/dev/null
+check "disattivate: i parametri tornano ignorati" "$orig" "$(imgb "http://$GW/pic.png?w=100" | wc -c | tr -d ' ')"
 
 echo "== HTTPS"
 dgx() { local b; b="$(python3 -c 'import json,sys; print(json.dumps({"url": sys.argv[1]}))' "$1")"; api $ADMIN/api/diagnose -d "$b"; }
@@ -200,6 +251,7 @@ check "sola lettura: può fare la diagnosi" 200 "$(b='{"url":"http://img.localho
 check "sola lettura: niente HTTPS automatico" 403 "$(b='{"enabled":true}'; code -X PUT $ADMIN/api/https -d "$b")"
 check "sola lettura: niente caricamento certificati" 403 "$(b='{"host":"img.localhost","chain":"x","key":"y"}'; code $ADMIN/api/certs/upload -d "$b")"
 check "sola lettura: niente redirect" 403 "$(b='{"host":"img.localhost","enabled":true}'; code $ADMIN/api/domains/redirect -d "$b")"
+check "sola lettura: non attiva le immagini" 403 "$(code -X PUT $ADMIN/api/rules/$rid -d '{"images":true}')"
 check "sola lettura: niente link" 403 "$(b='{"rule":"x","path":"/a","ttl_secs":60}'; code $ADMIN/api/links -d "$b")"
 check "sola lettura: non ruota la chiave" 403 "$(code $ADMIN/api/links/rotate -d '{}')"
 check "sola lettura: non attiva i link firmati" 403 "$(code -X PUT $ADMIN/api/rules/$rid -d '{"signed":true}')"

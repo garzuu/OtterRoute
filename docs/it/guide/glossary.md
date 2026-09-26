@@ -16,6 +16,8 @@
 
 **Endpoint** — indirizzo del servizio S3 (`https://s3.example.com`).
 
+**Immagini al volo** — ridimensionamento e conversione di un'immagine al momento della richiesta, con `?w=&h=&fmt=`. → [Immagini al volo](./images)
+
 **Instradamento** — regola *dominio + prefisso → destinazione + politica di cache*.
 
 **Link firmato** — indirizzo con `exp` (scadenza) e `sig` (firma) che permette di aprire un file riservato per un tempo limitato. → [Link firmati](./signed-links)
