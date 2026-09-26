@@ -7,7 +7,7 @@ export const fmtNum = (n: number) => new Intl.NumberFormat(loc()).format(n);
 export const fmtPct = (v: number | null) => (v === null ? "—" : `${(v * 100).toLocaleString(loc(), { maximumFractionDigits: 1 })}%`);
 /** Le latenze arrivano come limite superiore della fascia; oltre l'ultima fascia il valore è "enorme". */
 export const fmtMs = (v: number | null) =>
-  v === null ? "—" : v > 1e9 ? "> 2,5 s" : v >= 1000 ? `${(v / 1000).toLocaleString(loc())} s` : `≤ ${v} ms`;
+  v === null ? "—" : v > 1e9 ? `> ${(2.5).toLocaleString(loc())} s` : v >= 1000 ? `${(v / 1000).toLocaleString(loc())} s` : `≤ ${v} ms`;
 
 /** Estremo "tondo" per l'asse verticale. */
 function niceMax(v: number): number {
