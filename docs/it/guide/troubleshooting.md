@@ -52,6 +52,15 @@ Cerca il messaggio che vedi nel pannello o nella risposta. Se non lo trovi, la p
 | Invia prova: *chat not found* / *Unauthorized* | Chat id sbagliato, il bot non ha mai ricevuto un messaggio da quella chat, o token errato ([Notifiche](./notifications#telegram)). |
 | Non arriva nulla dopo un guasto | Il problema deve durare oltre l'attesa (default 10 minuti) e superare la soglia del canale. |
 
+## Certificati HTTPS
+
+| Sintomo | Cosa fare |
+|---|---|
+| Certificato in errore: *la CA non ha convalidato il dominio* | Il dominio deve arrivare a questo nodo sulla **porta 80 da Internet**; un firewall, un proxy o Cloudflare fanno fallire la sfida ([HTTPS automatico](./https)). |
+| Il browser dice «certificato non valido» ma il dominio è *Valido* | È attivo l'ambiente di **staging**: toglilo in Impostazioni → HTTPS. |
+| Il sito non si apre su HTTPS ma il certificato c'è | Il nodo non è in ascolto sulla 443 (porta occupata o permessi): guarda Impostazioni e il log; con Docker mappa `-p 443:443`. |
+| Dopo aver attivato il redirect il sito non si apre | Un proxy davanti reindirizza a sua volta in un ciclo: disattiva il redirect di uno dei due. |
+
 ## Avvio
 
 | Sintomo | Cosa fare |

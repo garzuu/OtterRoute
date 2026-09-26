@@ -158,7 +158,7 @@ has "attivazione 2FA registrata" '2fa.enable' "$audit"
 has "domini registrati" 'domain.add' "$audit"
 check "il registro chiede lo scope" 403 "$(code o "$ADMIN/api/audit")"
 check "i segreti non compaiono" 0 "$(grep -c -E "$secret|password_hash" <<<"$audit")"
-check "file utenti privato (0600)" 600 "$(stat -f '%Lp' "$work/state/users.json" 2>/dev/null || stat -c '%a' "$work/state/users.json")"
+check "file utenti privato (0600)" 600 "$(stat -c '%a' "$work/state/users.json" 2>/dev/null || stat -f '%Lp' "$work/state/users.json")"
 
 echo "== notifiche"
 check "operatore: niente notifiche (lettura)" 403 "$(code o $ADMIN/api/notifications)"
@@ -172,7 +172,7 @@ check "admin: salva le impostazioni" 200 "$(code a -X PUT $ADMIN/api/notificatio
 saved="$(c a $ADMIN/api/notifications)"
 check "i segreti non tornano indietro" 0 "$(grep -c 'SEGRETO' <<<"$saved")"
 check "…ma risulta che ci sono" true "$(jget "str(d['has_telegram_token'] and d['has_smtp_password']).lower()" <<<"$saved")"
-check "file dei segreti riservato (0600)" 600 "$(stat -f '%Lp' "$work/state/secrets/_notify.json" 2>/dev/null || stat -c '%a' "$work/state/secrets/_notify.json")"
+check "file dei segreti riservato (0600)" 600 "$(stat -c '%a' "$work/state/secrets/_notify.json" 2>/dev/null || stat -f '%Lp' "$work/state/secrets/_notify.json")"
 check "chat non valida rifiutata" 422 "$(code a -X PUT $ADMIN/api/notifications -d "${nb/-1001/abc}")"
 check "il registro attività non ha segreti" 0 "$(c a "$ADMIN/api/audit" | grep -c 'SEGRETO')"
 

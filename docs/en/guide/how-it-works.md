@@ -27,7 +27,7 @@ visitor ──► DNS ──► [proxy / CDN / load balancer] ──► OtterRou
 
 | Part | Where | What it does |
 |---|---|---|
-| **Public gateway** | port **80** (HTTP) | Serves files to visitors. `443` (HTTPS) is reserved but not served yet: see [HTTPS and proxy](./https-proxy). |
+| **Public gateway** | port **80** (HTTP) | Serves files to visitors. With automatic certificates it also serves **HTTPS** on 443: see [Automatic HTTPS](./https) (or [HTTPS and proxy](./https-proxy)). |
 | **Panel and API** | port **9090**, `localhost` only | Domains, buckets, routes, users, statistics. Never expose it. |
 | **Cache** | folder on disk | Copies of files, with a space limit (LRU). |
 | **State** | folder on disk | Users, generated configuration, credentials, statistics, activity log. |
@@ -40,7 +40,7 @@ The panel is not an accessory: it **generates** the gateway configuration (`conf
 - ✅ Verifies that domains really reach the node and rechecks over time.
 - ✅ Shows statistics and exposes them to Prometheus.
 - ❌ **Read-only**: it accepts `GET` and `HEAD`, no writes to the storage.
-- ❌ **No built-in HTTPS**: put a proxy in front (Caddy, nginx, Traefik, Cloudflare).
+- ✅ **Built-in HTTPS** with free certificates that renew by themselves (HTTP-01 challenge), or a proxy in front (Caddy, nginx, Traefik, Cloudflare).
 - ❌ **No folder listing**: `/folder/` answers `404`, there is no automatic `index.html`.
 - ❌ The **query string never reaches the storage** and is not part of the cache key, except for the parameters a cache policy allows.
 

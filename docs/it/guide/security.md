@@ -19,7 +19,7 @@ OtterRoute serve file di **sola lettura** da bucket privati. Chi lo visita non h
 
 1. **Non esporre la porta 9090.** Il pannello e `/metrics` sono pensati per `localhost`. Per lavorare da remoto usa un tunnel SSH o una VPN.
 2. **Chiavi con il minimo dei permessi.** Una chiave dedicata, di sola lettura, limitata al bucket (o alla cartella) pubblicato. → [Bucket S3](./buckets-s3)
-3. **HTTPS davanti al nodo**, perché HTTP in chiaro non protegge nulla in transito. → [HTTPS e proxy](./https-proxy)
+3. **HTTPS attivo**, perché HTTP in chiaro non protegge nulla in transito: [certificati automatici](./https) oppure [un proxy davanti](./https-proxy).
 4. **2FA obbligatoria** almeno per gli amministratori. → [Utenti, permessi e 2FA](./users-2fa)
 5. **Backup della cartella di stato**, con gli stessi permessi ristretti. → [Aggiornamenti e backup](./upgrades-backup)
 6. **Orologio sincronizzato** (NTP): serve alla firma delle richieste allo storage e ai codici 2FA.
@@ -31,6 +31,7 @@ OtterRoute serve file di **sola lettura** da bucket privati. Chi lo visita non h
 |---|---|
 | `secrets/*.json` | Chiavi dei bucket, password SMTP, token Telegram e chiave dei [link firmati](./signed-links) (permessi 0600). |
 | `users.json` | Hash delle password, segreti 2FA, hash dei codici di recupero (0600). |
+| `certs/<dominio>/privkey.pem` | Chiavi private dei certificati HTTPS (permessi 0600). |
 | `panel.json`, `last-good.yaml` | Configurazione (senza chiavi). |
 | `audit.jsonl` | Chi ha fatto cosa (senza segreti). |
 | `metrics.json` | Statistiche. |

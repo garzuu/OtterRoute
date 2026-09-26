@@ -3,8 +3,8 @@ source_commit: dd1d866
 ---
 # HTTPS and proxy
 
-::: warning HTTPS is not built in
-Today OtterRoute answers **only over HTTP** on port 80. Port 443 is reserved and visible in the settings, but the node does not serve it. For HTTPS put a proxy or CDN in front that terminates TLS and forwards traffic to the node.
+::: tip You only need a proxy in some cases
+OtterRoute can serve [HTTPS by itself](./https), with free certificates that renew automatically. A proxy or CDN in front makes sense if you already have one, if the domain goes through Cloudflare (the certificate challenge would not reach the node), if the node cannot listen on 443 or if you want a single entry point for several services. In that case the proxy terminates TLS and forwards traffic over HTTP to the node.
 :::
 
 ## Diagram

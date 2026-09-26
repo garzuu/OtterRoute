@@ -11,6 +11,7 @@ Tutto ciò che conta sta nella **cartella di stato** (`OTR_STATE_DIR`, `/data/st
 | `secrets/` | Le chiavi dei bucket. Permessi `0600`. |
 | `last-good.yaml` | L'ultima configurazione valida (il nodo la usa se il file indicato non è disponibile). |
 | `node-id` | L'identità del nodo. |
+| `certs/` | Certificati HTTPS e relative chiavi (0600). Si possono anche riemettere, ma non quelli caricati a mano. |
 | `notify.json`, `notify-state.json`, `notify-log.json` | Impostazioni delle [notifiche](./notifications), problemi già notificati, ultimi invii. |
 | `metrics.json`, `audit.jsonl` | Statistiche e registro attività. |
 

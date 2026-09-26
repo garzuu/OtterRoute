@@ -45,6 +45,7 @@ export const sections: Section[] = [
       { slug: "guide/statistics", it: "Statistiche e metriche", en: "Statistics and metrics" },
       { slug: "guide/diagnosis", it: "Diagnosi", en: "Diagnosis" },
       { slug: "guide/notifications", it: "Notifiche", en: "Notifications" },
+      { slug: "guide/https", it: "HTTPS automatico", en: "Automatic HTTPS" },
       { slug: "guide/https-proxy", it: "HTTPS e proxy", en: "HTTPS and proxies" },
       { slug: "guide/security", it: "Sicurezza", en: "Security" },
       { slug: "guide/upgrades-backup", it: "Aggiornamenti e backup", en: "Upgrades and backup" },

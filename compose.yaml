@@ -6,8 +6,8 @@ services:
     build: .
     environment:
       RUST_LOG: otterroute=info
-    # porte standard: 80 HTTP pubblico, 9090 pannello solo da localhost
-    ports: ["80:80", "127.0.0.1:9090:9090"]
+    # porte standard: 80 HTTP e 443 HTTPS pubblici, 9090 pannello solo da localhost
+    ports: ["80:80", "443:443", "127.0.0.1:9090:9090"]
     # l'utente del container non è root: gli serve poter usare la porta 80
     sysctls:
       net.ipv4.ip_unprivileged_port_start: 0

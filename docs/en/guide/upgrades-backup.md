@@ -14,6 +14,7 @@ Everything that matters is in the **state folder** (`OTR_STATE_DIR`, `/data/stat
 | `secrets/` | Bucket keys. `0600` permissions. |
 | `last-good.yaml` | The last valid configuration (the node uses it if the indicated file is unavailable). |
 | `node-id` | The node's identity. |
+| `certs/` | HTTPS certificates and their keys (0600). They can be reissued, but not the ones uploaded by hand. |
 | `notify.json`, `notify-state.json`, `notify-log.json` | [Notification](./notifications) settings, already-notified problems, latest sends. |
 | `metrics.json`, `audit.jsonl` | Statistics and activity log. |
 

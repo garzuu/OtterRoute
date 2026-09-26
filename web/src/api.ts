@@ -88,6 +88,23 @@ export interface DomainInfo {
   stages: Stage[];
   ever_verified: boolean;
   since: string | null;
+  redirect_https: boolean;
+}
+
+export interface CertInfo {
+  host: string;
+  status: "valid" | "expiring" | "expired" | "missing" | "error" | "issuing";
+  not_after: number | null;
+  issued_at: number | null;
+  error: { at: number; message: string } | null;
+  /** il nodo lo sta servendo su HTTPS */
+  serving: boolean;
+}
+
+export interface AcmeSettings {
+  enabled: boolean;
+  email: string;
+  staging: boolean;
 }
 
 export interface BucketCheck {
@@ -147,10 +164,12 @@ export interface PanelState {
   hand_managed: boolean;
   /** canali di notifica attivi il cui ultimo invio è fallito (solo con notifications:manage) */
   notify_failing?: string[];
+  https_listening: boolean;
+  certs: CertInfo[];
   recheck_minutes: number;
   recheck_verified_minutes: number;
   panel: {
-    settings: { http_port: number | null; https_port: number | null };
+    settings: { http_port: number | null; https_port: number | null; acme: AcmeSettings };
     domains: DomainInfo[];
     buckets: BucketInfo[];
     rules: RuleInfo[];
@@ -338,6 +357,12 @@ export const api = {
 
   addRule: (r: { domain: string; path_prefix: string; bucket_id: string; folder: string }) =>
     post<RuleInfo>("/api/rules", r),
+  saveHttps: (b: AcmeSettings) => request<AcmeSettings>("/api/https", "PUT", b),
+  issueCert: (host: string) => post<{ started: boolean }>("/api/certs/issue", { host }),
+  uploadCert: (host: string, chain: string, key: string) =>
+    post<{ host: string; not_after: number }>("/api/certs/upload", { host, chain, key }),
+  setRedirect: (host: string, enabled: boolean) =>
+    post<{ host: string; redirect_https: boolean }>("/api/domains/redirect", { host, enabled }),
   setRuleSigned: (id: string, signed: boolean) =>
     request<{ id: string; signed: boolean }>(`/api/rules/${encodeURIComponent(id)}`, "PUT", { signed }),
   createLink: (b: { rule: string; path: string; ttl_secs: number; https?: boolean }) =>

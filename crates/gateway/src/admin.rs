@@ -48,6 +48,7 @@ pub struct Admin {
     pub write_lock: Mutex<()>,
     pub auth: Auth,
     pub notifier: Arc<crate::notify::Notifier>,
+    pub acme: Arc<crate::acme::Acme>,
 }
 
 pub async fn handle(
@@ -119,10 +120,16 @@ pub fn access(method: &Method, path: &str) -> Option<Access> {
     Some(match (m, path) {
         ("GET", "/api/panel") => Open,
         ("GET", "/api/metrics") => Scope("metrics:read"),
-        ("PUT", "/api/settings") => Scope("settings:write"),
-        ("POST", "/api/domains" | "/api/domains/check" | "/api/domains/test") => {
-            Scope("domains:write")
-        }
+        ("PUT", "/api/settings" | "/api/https") => Scope("settings:write"),
+        (
+            "POST",
+            "/api/domains"
+            | "/api/domains/check"
+            | "/api/domains/test"
+            | "/api/domains/redirect"
+            | "/api/certs/issue"
+            | "/api/certs/upload",
+        ) => Scope("domains:write"),
         ("DELETE", p) if p.starts_with("/api/domains/") => Scope("domains:write"),
         ("POST", "/api/buckets" | "/api/buckets/check" | "/api/buckets/test") => {
             Scope("buckets:write")
@@ -213,6 +220,10 @@ async fn api(
         (&Method::GET, "/api/metrics") => metrics_api(admin, req.uri().query()),
         (&Method::PUT, "/api/settings") => with_body!(SettingsReq, save_settings),
         (&Method::POST, "/api/domains") => with_body!(HostReq, add_domain),
+        (&Method::PUT, "/api/https") => with_body!(HttpsReq, save_https),
+        (&Method::POST, "/api/certs/issue") => with_body!(HostReq, issue_cert),
+        (&Method::POST, "/api/certs/upload") => with_body!(UploadCertReq, upload_cert),
+        (&Method::POST, "/api/domains/redirect") => with_body!(RedirectReq, set_redirect),
         (&Method::POST, "/api/domains/check") => with_body!(HostReq, check_domain),
         (&Method::POST, "/api/domains/test") => with_body!(HostReq, test_domain),
         (&Method::POST, "/api/buckets/check") => with_body!(IdReq, check_bucket_saved),
@@ -564,6 +575,31 @@ fn metrics_api(admin: &Admin, query: Option<&str>) -> Response<Body> {
     json(StatusCode::OK, out)
 }
 
+/// Stato dei certificati di ogni dominio, per la tabella Domini e gli avvisi.
+fn certs_json(admin: &Admin, p: &Panel) -> Vec<Value> {
+    let now = sign::now_secs();
+    p.domains
+        .iter()
+        .filter(|d| crate::acme::certifiable(&d.host))
+        .map(|d| {
+            let info = crate::tls::read_info(&admin.state_dir, &d.host);
+            let status = if admin.acme.is_issuing(&d.host) {
+                "issuing"
+            } else {
+                crate::tls::status(&info, now)
+            };
+            json!({
+                "host": d.host,
+                "status": status,
+                "not_after": info.not_after,
+                "issued_at": info.issued_at,
+                "error": info.error,
+                "serving": admin.state.tls.store.has(&d.host),
+            })
+        })
+        .collect()
+}
+
 fn panel_state(admin: &Admin, pr: &Principal) -> Response<Body> {
     let state = &admin.state;
     let panel = match panel::load(&admin.state_dir) {
@@ -582,6 +618,8 @@ fn panel_state(admin: &Admin, pr: &Principal) -> Response<Body> {
         "recheck_minutes": (admin.recheck_pending.as_secs() / 60).max(1),
         "recheck_verified_minutes": (admin.recheck_verified.as_secs() / 60).max(1),
         "panel": panel,
+        "https_listening": state.tls.is_listening(),
+        "certs": certs_json(admin, &panel),
     });
     // chi non può leggere una risorsa non ne vede nemmeno l'elenco
     for (scope, path) in [
@@ -883,6 +921,7 @@ async fn save_settings(admin: &Admin, req: SettingsReq) -> Response<Body> {
     if let Err(r) = save_panel(admin, &p) {
         return r;
     }
+    admin.state.tls.apply_panel(&p);
     audit::log(
         "settings.update",
         &format!("http {} · https {}", p.settings.http(), p.settings.https()),
@@ -996,6 +1035,171 @@ async fn notifications_test(admin: &Admin, req: NotifyTestReq) -> Response<Body>
     }
 }
 
+// --- HTTPS ------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct HttpsReq {
+    enabled: bool,
+    #[serde(default)]
+    email: String,
+    #[serde(default)]
+    staging: bool,
+}
+
+async fn save_https(admin: &Admin, req: HttpsReq) -> Response<Body> {
+    if !crate::acme::valid_email(&req.email) {
+        return bad("indirizzo email non valido");
+    }
+    let _g = admin.write_lock.lock().await;
+    let mut p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    p.settings.acme = panel::AcmeSettings {
+        enabled: req.enabled,
+        email: req.email.trim().to_owned(),
+        staging: req.staging,
+    };
+    if let Err(r) = save_panel(admin, &p) {
+        return r;
+    }
+    audit::log(
+        "https.update",
+        &format!(
+            "{}{}",
+            if req.enabled {
+                "certificati automatici"
+            } else {
+                "disattivati"
+            },
+            if req.staging {
+                " · prova (staging)"
+            } else {
+                ""
+            }
+        ),
+    );
+    if req.enabled {
+        admin.acme.kick();
+    }
+    json(StatusCode::OK, json!(p.settings.acme))
+}
+
+/// Richiede subito il certificato di un dominio (senza aspettare il giro periodico).
+async fn issue_cert(admin: &Admin, req: HostReq) -> Response<Body> {
+    let host = req.host.trim().to_ascii_lowercase();
+    let p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    if !p.settings.acme.enabled {
+        return bad("attiva prima i certificati automatici in Impostazioni → HTTPS");
+    }
+    match p.domains.iter().find(|d| d.host == host) {
+        None => return error(StatusCode::NOT_FOUND, "dominio non censito"),
+        Some(d) if !d.verified => return bad("il dominio non è ancora verificato"),
+        Some(_) => {}
+    }
+    if !crate::acme::certifiable(&host) {
+        return bad("questo nome non può avere un certificato pubblico (dominio locale o IP)");
+    }
+    if admin.acme.is_issuing(&host) {
+        return error(
+            StatusCode::CONFLICT,
+            "è già in corso un'emissione per questo dominio",
+        );
+    }
+    let acme = admin.acme.clone();
+    let h = host.clone();
+    tokio::spawn(async move {
+        let _ = acme.issue(&h).await;
+    });
+    audit::log("cert.issue", &host);
+    json(StatusCode::ACCEPTED, json!({ "started": true }))
+}
+
+#[derive(Deserialize)]
+struct UploadCertReq {
+    host: String,
+    /// certificato e catena in PEM
+    chain: String,
+    /// chiave privata in PEM
+    key: String,
+}
+
+/// Carica un certificato ottenuto altrove (CA aziendale, wildcard…) per un dominio censito.
+async fn upload_cert(admin: &Admin, req: UploadCertReq) -> Response<Body> {
+    let host = req.host.trim().to_ascii_lowercase();
+    let _g = admin.write_lock.lock().await;
+    let p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    if !p.domains.iter().any(|d| d.host == host) {
+        return error(StatusCode::NOT_FOUND, "dominio non censito");
+    }
+    let meta = match crate::tls::save_cert(
+        &admin.state_dir,
+        &host,
+        &req.chain,
+        &req.key,
+        sign::now_secs(),
+    ) {
+        Ok(m) => m,
+        Err(e) => return bad(e),
+    };
+    if let Err(e) = crate::tls::load_host(&admin.state_dir, &host, &admin.state.tls.store) {
+        return bad(e);
+    }
+    admin.state.tls.apply_panel(&p);
+    audit::log("cert.upload", &host);
+    json(
+        StatusCode::OK,
+        json!({ "host": host, "not_after": meta.not_after }),
+    )
+}
+
+#[derive(Deserialize)]
+struct RedirectReq {
+    host: String,
+    enabled: bool,
+}
+
+async fn set_redirect(admin: &Admin, req: RedirectReq) -> Response<Body> {
+    let host = req.host.trim().to_ascii_lowercase();
+    let _g = admin.write_lock.lock().await;
+    let mut p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    if req.enabled && !admin.state.tls.store.has(&host) {
+        return bad("il dominio non ha ancora un certificato valido: ottienilo prima, altrimenti il sito diventerebbe irraggiungibile");
+    }
+    let Some(d) = p.domains.iter_mut().find(|d| d.host == host) else {
+        return error(StatusCode::NOT_FOUND, "dominio non censito");
+    };
+    d.redirect_https = req.enabled;
+    if let Err(r) = save_panel(admin, &p) {
+        return r;
+    }
+    admin.state.tls.apply_panel(&p);
+    audit::log(
+        "domain.redirect",
+        &format!(
+            "{host} · {}",
+            if req.enabled {
+                "HTTP → HTTPS"
+            } else {
+                "nessun redirect"
+            }
+        ),
+    );
+    json(
+        StatusCode::OK,
+        json!({ "host": host, "redirect_https": req.enabled }),
+    )
+}
+
 // --- domini ---------------------------------------------------------------
 
 #[derive(Deserialize)]
@@ -1026,6 +1230,7 @@ async fn add_domain(admin: &Admin, req: HostReq) -> Response<Body> {
         stages: vec![],
         ever_verified: false,
         since: None,
+        redirect_https: false,
     };
     d.apply(dns::check_domain(&host, p.settings.http(), &admin.state.node_id).await);
     p.domains.push(d.clone());
@@ -1089,6 +1294,12 @@ async fn delete_domain(admin: &Admin, host: &str) -> Response<Body> {
     }
     if let Err(r) = save_panel(admin, &p) {
         return r;
+    }
+    // il certificato non serve più: si toglie dalla memoria e dal disco
+    admin.state.tls.store.remove(host);
+    admin.state.tls.apply_panel(&p);
+    if crate::tls::safe_host(host) {
+        let _ = std::fs::remove_dir_all(crate::tls::certs_dir(&admin.state_dir).join(host));
     }
     audit::log("domain.delete", host);
     json(StatusCode::OK, json!({"ok": true}))
@@ -1842,13 +2053,31 @@ async fn diagnose(admin: &Admin, req: DiagnoseReq) -> Response<Body> {
     // 0. indirizzo
     let mut first = Step::new("url", "Indirizzo", Status::Ok, format!("{host}{raw_path}"));
     if parsed.scheme() == "https" {
-        first = Step::new(
-            "url",
-            "Indirizzo",
-            Status::Warn,
-            format!("{host}{raw_path} — il nodo risponde solo in HTTP: HTTPS dipende da un proxy davanti."),
-        )
-        .fix("Se lo apri in HTTPS e non funziona, la causa può essere il proxy/CDN e non OtterRoute (vedi la guida «HTTPS e proxy»).");
+        let tls = &admin.state.tls;
+        first = if tls.store.has(&host) && tls.is_listening() {
+            Step::new(
+                "url",
+                "Indirizzo",
+                Status::Ok,
+                format!("{host}{raw_path} — HTTPS servito da questo nodo con il suo certificato."),
+            )
+        } else if tls.store.has(&host) {
+            Step::new(
+                "url",
+                "Indirizzo",
+                Status::Warn,
+                format!("{host}{raw_path} — il dominio ha un certificato ma il nodo non è in ascolto per HTTPS."),
+            )
+            .fix("Libera la porta HTTPS (443, o quella di OTR_HTTPS_LISTEN) e riavvia il nodo.")
+        } else {
+            Step::new(
+                "url",
+                "Indirizzo",
+                Status::Warn,
+                format!("{host}{raw_path} — questo nodo non ha un certificato per il dominio: HTTPS dipende da un proxy davanti."),
+            )
+            .fix("Attiva i certificati automatici (Impostazioni → HTTPS) e ottieni il certificato del dominio, oppure metti un proxy con TLS davanti al nodo (guida «HTTPS»).")
+        };
     }
     steps.push(first);
 

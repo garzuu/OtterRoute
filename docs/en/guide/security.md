@@ -22,7 +22,7 @@ OtterRoute serves **read-only** files from private buckets. Whoever visits has n
 
 1. **Do not expose port 9090.** The panel and `/metrics` are meant for `localhost`. To work remotely use an SSH tunnel or a VPN.
 2. **Keys with minimum permissions.** A dedicated, read-only key limited to the published bucket (or folder). → [S3 buckets](./buckets-s3)
-3. **HTTPS in front of the node**, because plain HTTP protects nothing in transit. → [HTTPS and proxy](./https-proxy)
+3. **HTTPS enabled**, because plain HTTP protects nothing in transit: [automatic certificates](./https) or [a proxy in front](./https-proxy).
 4. **Mandatory 2FA** at least for administrators. → [Users, permissions and 2FA](./users-2fa)
 5. **Back up the state folder**, with the same restricted permissions. → [Upgrades and backup](./upgrades-backup)
 6. **Synchronized clock** (NTP): it is needed for signing requests to the storage and for 2FA codes.
@@ -34,6 +34,7 @@ OtterRoute serves **read-only** files from private buckets. Whoever visits has n
 |---|---|
 | `secrets/*.json` | Bucket keys, SMTP password, Telegram token and the [signed links](./signed-links) key (0600 permissions). |
 | `users.json` | Password hashes, 2FA secrets, recovery code hashes (0600). |
+| `certs/<domain>/privkey.pem` | Private keys of the HTTPS certificates (0600 permissions). |
 | `panel.json`, `last-good.yaml` | Configuration (without keys). |
 | `audit.jsonl` | Who did what (without secrets). |
 | `metrics.json` | Statistics. |

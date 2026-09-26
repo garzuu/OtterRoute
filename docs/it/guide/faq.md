@@ -1,7 +1,7 @@
 # Domande frequenti
 
 **OtterRoute serve anche HTTPS?**
-Non direttamente: metti davanti un proxy o una CDN. → [HTTPS e proxy](./https-proxy)
+Sì: con i certificati automatici (Let's Encrypt) o con un certificato tuo. → [HTTPS automatico](./https). Se preferisci un proxy o una CDN, vedi [HTTPS e proxy](./https-proxy).
 
 **Posso usare più domini sullo stesso bucket?**
 Sì: crei più instradamenti (uno per dominio) verso la stessa destinazione.

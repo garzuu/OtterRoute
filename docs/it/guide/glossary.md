@@ -12,6 +12,8 @@
 
 **Dominio** — nome pubblico che punta al nodo.
 
+**ACME / HTTP-01** — protocollo con cui una CA (Let's Encrypt) rilascia i certificati; la sfida HTTP-01 verifica il dominio con una richiesta sulla porta 80. → [HTTPS automatico](./https)
+
 **Endpoint** — indirizzo del servizio S3 (`https://s3.example.com`).
 
 **Instradamento** — regola *dominio + prefisso → destinazione + politica di cache*.

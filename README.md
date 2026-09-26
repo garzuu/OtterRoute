@@ -23,14 +23,14 @@ I sorgenti della guida sono in [`docs/`](docs/).
 - **Pannello** su `127.0.0.1:9090`: domini verificati davvero (DNS + richiesta al nodo), bucket, instradamenti, statistiche, utenti con permessi e 2FA, registro attività.
 - **Notifiche** email (SMTP) e Telegram quando un dominio o un bucket va in errore, e quando rientra.
 - **Metriche Prometheus** su `/metrics`.
-- **HTTP** sulla porta 80; per HTTPS va messo davanti un proxy (vedi la guida).
+- **HTTP** sulla porta 80 e **HTTPS automatico** (certificati gratuiti che si rinnovano da soli) sulla 443; oppure un proxy davanti (vedi la guida).
 
 ## Avvio rapido
 
 ```sh
 docker build -t otterroute .
 docker run -d --name otterroute \
-  -p 80:80 -p 127.0.0.1:9090:9090 \
+  -p 80:80 -p 443:443 -p 127.0.0.1:9090:9090 \
   -v otterroute-data:/data \
   otterroute
 ```

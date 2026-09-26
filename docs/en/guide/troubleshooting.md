@@ -55,6 +55,15 @@ Look for the message you see in the panel or in the response. If you cannot find
 | Send test: *chat not found* / *Unauthorized* | Wrong chat id, the bot never received a message from that chat, or wrong token ([Notifications](./notifications#telegram)). |
 | Nothing arrives after a failure | The problem must last beyond the delay (default 10 minutes) and meet the channel's threshold. |
 
+## HTTPS certificates
+
+| Symptom | What to do |
+|---|---|
+| Certificate in error: *the CA did not validate the domain* | The domain must reach this node on **port 80 from the Internet**; a firewall, a proxy or Cloudflare make the challenge fail ([Automatic HTTPS](./https)). |
+| The browser says "invalid certificate" but the domain is *Valid* | The **staging** environment is on: turn it off in Settings → HTTPS. |
+| The site does not open on HTTPS but the certificate exists | The node is not listening on 443 (port in use or permissions): look at Settings and the log; with Docker map `-p 443:443`. |
+| After enabling the redirect the site does not open | A proxy in front redirects in turn, in a loop: disable the redirect on one of the two. |
+
 ## Startup
 
 | Symptom | What to do |

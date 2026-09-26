@@ -1,7 +1,7 @@
 # HTTPS e proxy
 
-::: warning HTTPS non è integrato
-Oggi OtterRoute risponde **solo in HTTP** sulla porta 80. La porta 443 è riservata e visibile nelle impostazioni, ma il nodo non la serve. Per HTTPS metti davanti un proxy o una CDN che termina TLS e inoltra il traffico al nodo.
+::: tip Ti serve un proxy solo in alcuni casi
+OtterRoute sa servire [HTTPS da solo](./https), con certificati gratuiti che si rinnovano in automatico. Un proxy o una CDN davanti ha senso se ce l'hai già, se il dominio passa da Cloudflare (la sfida dei certificati non arriverebbe al nodo), se il nodo non può ascoltare sulla 443 o se vuoi un unico punto di ingresso per più servizi. In quel caso il proxy termina TLS e inoltra il traffico in HTTP al nodo.
 :::
 
 ## Schema

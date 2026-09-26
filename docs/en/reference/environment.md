@@ -9,6 +9,9 @@ Every option can be given as a flag (`--cache-dir`) or as an environment variabl
 |---|---|---|---|
 | `OTR_CONFIG` | `--config` | `config.yaml` | Configuration file. With the panel it is generated from `panel.json`. |
 | `OTR_LISTEN` | `--listen` | `0.0.0.0:80` | Public HTTP address. |
+| `OTR_HTTPS_LISTEN` | `--https-listen` | `0.0.0.0:443` | Public HTTPS address. Empty = HTTPS disabled. If the port is not available the node still starts (without HTTPS). |
+| `OTR_ACME_DIRECTORY` | `--acme-directory` | — | ACME directory other than Let's Encrypt (for tests, e.g. Pebble). |
+| `OTR_ACME_CA_ROOT` | `--acme-ca-root` | — | PEM file with the root CA of the alternative directory. |
 | `OTR_ADMIN_LISTEN` | `--admin-listen` | `127.0.0.1:9090` | Panel, API, `/healthz` and `/metrics`. Keep it local. |
 | `OTR_CACHE_DIR` | `--cache-dir` | `./data/cache` | Disk cache folder. |
 | `OTR_CACHE_MAX_BYTES` | `--cache-max-bytes` | `10737418240` (10 GiB) | Maximum cache size. |
@@ -38,5 +41,5 @@ The public HTTP/HTTPS ports shown in the panel's **Settings** are the ones used 
 | Port | Use | Note |
 |---|---|---|
 | 80 | Public HTTP traffic | Serves files and the verification proof. |
-| 443 | HTTPS | Reserved: not served by the node. [HTTPS and proxy](/en/guide/https-proxy) |
+| 443 | HTTPS | Automatic or uploaded certificates. [Automatic HTTPS](/en/guide/https) |
 | 9090 | Panel, API, metrics | `127.0.0.1` only by default. |

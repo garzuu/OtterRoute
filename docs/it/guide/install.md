@@ -61,7 +61,7 @@ WantedBy=multi-user.target
 | Porta | Uso | Si cambia con |
 |---|---|---|
 | **80** | HTTP pubblico (i domini arrivano qui) | `OTR_LISTEN` per l'ascolto; **Impostazioni → HTTP** per la porta usata nei controlli |
-| **443** | HTTPS: riservata, non ancora servita | Impostazioni → HTTPS |
+| **443** | HTTPS (con [certificati automatici](./https)) | `OTR_HTTPS_LISTEN` per l'ascolto; Impostazioni → Porte per la porta usata nei redirect |
 | **9090** | Pannello e API, solo localhost | `OTR_ADMIN_LISTEN` |
 
 Tutte le opzioni sono nel [riferimento delle variabili d'ambiente](/reference/environment).
