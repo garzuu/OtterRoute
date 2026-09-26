@@ -17,7 +17,8 @@ use sha2::{Digest, Sha256};
 pub const PUBLIC_KEY_HEX: &str = "d6168312b8b6376f58d3c8d889a960ba5704100ca4e3cde3683cf31095b2bfcd";
 
 pub const MAX_ARCHIVE: u64 = 100 * 1024 * 1024;
-const MAX_UNPACKED: u64 = 250 * 1024 * 1024;
+/// Limite complessivo (e per singolo file) dopo la decompressione. Una release vera pesa meno di 20 MiB.
+const MAX_UNPACKED: u64 = 300 * 1024 * 1024;
 const KEEP_BACKUPS: usize = 3;
 /// Tentativi di avvio senza conferma prima di tornare indietro.
 pub const MAX_START_ATTEMPTS: u32 = 3;
@@ -147,7 +148,7 @@ pub fn extract(tar_gz: &[u8], dest: &Path) -> Result<Extracted, String> {
             continue;
         }
         let size = entry.header().size().unwrap_or(0);
-        if size > MAX_ARCHIVE {
+        if size > MAX_UNPACKED {
             return Err("un file dell'archivio è troppo grande".into());
         }
         total += size;

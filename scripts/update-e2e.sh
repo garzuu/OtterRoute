@@ -40,6 +40,7 @@ pkg() {
   local top="otterroute-v$ver-$PLAT" name="otterroute-v$ver-$PLAT.tar.gz"
   rm -rf "$dir" "$work/pk"; mkdir -p "$dir" "$work/pk/$top/ui" "$work/pk/$top/docs"
   cp "$bin" "$work/pk/$top/otterroute" 2>/dev/null || cp "$3" "$work/pk/$top/otterroute"
+  strip "$work/pk/$top/otterroute" 2>/dev/null || true   # i binari di debug sono enormi: come in una release
   echo "ui nuova $ver" > "$work/pk/$top/ui/index.html"; echo "guida nuova $ver" > "$work/pk/$top/docs/index.html"
   echo "readme" > "$work/pk/$top/README.md"
   tar czf "$dir/$name" -C "$work/pk" "$top"
