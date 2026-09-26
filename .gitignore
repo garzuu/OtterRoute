@@ -6,3 +6,6 @@ node_modules/
 web/dist/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+
+# contesto di build dell'immagine di rilascio (creato dal workflow)
+/ctx/

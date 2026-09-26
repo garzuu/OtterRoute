@@ -3,6 +3,9 @@
 ### Corretto
 - Guida: dietro Cloudflare (nuvola arancione) l'emissione ACME non «fallisce» sempre; riesce se la sfida non viene reindirizzata a HTTPS. Aggiunti i passi per farla passare.
 
+### Modificato
+- Rilascio: l'immagine Docker non ricompila più il codice (in emulazione arm64 richiedeva circa un'ora): usa i pacchetti già costruiti e firmati dal job dei binari (`Dockerfile.release`). Il `Dockerfile` per costruire dai sorgenti non cambia.
+
 ### Aggiunto
 - Interfaccia multilingua, prima fase: modulo di traduzione interno (`web/src/i18n`), selettore IT/EN nel menu utente (lingua del browser al primo accesso, poi scelta salvata), date e numeri nel formato della lingua. Il pannello è ora tradotto in italiano e inglese (pagine, menu, avvisi, accesso e 2FA); anche i messaggi d'errore più comuni del server e le descrizioni dei permessi sono tradotti, e i link «?» aprono la guida nella lingua scelta. I messaggi dinamici del server (con nomi e numeri) restano in italiano.
 - **Backup e ripristino dal pannello**: un file `.otrbak` cifrato (AES-256-GCM, Argon2id) con utenti, chiavi, certificati e configurazione; ripristino con controllo preventivo, rifiuto di backup di versioni più recenti, copia dello stato precedente e riavvio del nodo. Scope `users:manage`.

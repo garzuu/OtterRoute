@@ -105,13 +105,28 @@ jobs:
             otterroute-*.tar.gz.sha256
 
   image:
+    # niente compilazione qui: l'immagine usa i pacchetti già costruiti dal job `binaries`
+    # (musl, statici) e la stessa provenienza dei tarball firmati. Vedi Dockerfile.release.
     name: Immagine
+    needs: binaries
     runs-on: ubuntu-latest
     outputs:
       tags: ${{ steps.meta.outputs.tags }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: "bin-linux-*", path: pkg, merge-multiple: true }
+      - name: Contesto di build (eseguibile, pannello e guida per architettura)
+        run: |
+          for pair in "linux-x86_64 linux-amd64" "linux-aarch64 linux-arm64"; do
+            set -- $pair
+            mkdir -p "ctx/$2"
+            tar xzf pkg/otterroute-*-"$1".tar.gz --strip-components=1 -C "ctx/$2"
+            test -x "ctx/$2/otterroute" && test -f "ctx/$2/ui/index.html" && test -f "ctx/$2/docs/index.html"
+          done
+          ls -l ctx/*/otterroute
       - uses: docker/setup-qemu-action@v3
+        with: { platforms: arm64 }
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -131,6 +146,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile.release
+          platforms: linux/amd64
           load: true
           tags: otterroute:smoke
       - name: Prova dell'immagine
@@ -147,11 +164,10 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile.release
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   release:
     needs: [binaries, image]
