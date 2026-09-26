@@ -21,6 +21,7 @@ mod s3;
 mod sign;
 mod tls;
 mod totp;
+mod update;
 mod users;
 
 use std::net::SocketAddr;
@@ -101,6 +102,15 @@ struct Args {
     /// Certificato radice della CA della directory ACME alternativa
     #[arg(long, env = "OTR_ACME_CA_ROOT")]
     acme_ca_root: Option<PathBuf>,
+    /// `off` spegne ogni richiesta in uscita verso GitHub per cercare nuove versioni
+    #[arg(long, env = "OTR_UPDATE_CHECK", default_value = "on")]
+    update_check: String,
+    /// API delle release (per fork o mirror interni; default: il repository ufficiale)
+    #[arg(long, env = "OTR_UPDATE_API")]
+    update_api: Option<String>,
+    /// Come è installato il nodo (`docker` nell'immagine ufficiale): decide le istruzioni di aggiornamento
+    #[arg(long, env = "OTR_INSTALL")]
+    install: Option<String>,
     /// Indirizzo con cui si raggiunge il pannello, per il link nelle notifiche (facoltativo)
     #[arg(long, env = "OTR_PUBLIC_URL")]
     public_url: Option<String>,
@@ -194,6 +204,14 @@ async fn main() -> anyhow::Result<()> {
             .clone()
             .filter(|h| tls_state.store.has(h)),
     );
+    let updater = Arc::new(update::Updater::new(
+        args.state_dir.clone(),
+        args.update_api.clone(),
+    ));
+    if let Some(from) = update::note_startup(&args.state_dir, update::CURRENT, update::now_pub()) {
+        tracing::info!(da = %from, a = update::CURRENT, "versione aggiornata");
+        audit::log("update.applied", &format!("{from} → {}", update::CURRENT));
+    }
     let admin_ctx = Arc::new(admin::Admin {
         state: state.clone(),
         config_path: args.config.clone(),
@@ -209,9 +227,14 @@ async fn main() -> anyhow::Result<()> {
         notifier: notifier.clone(),
         acme: acme.clone(),
         gate: gate.clone(),
+        updater: updater.clone(),
     });
     tokio::spawn(acme.clone().run());
     let admin_pub = admin_ctx.clone();
+    {
+        let (u, dir) = (updater.clone(), args.state_dir.clone());
+        tokio::spawn(u.run(move || panel::load(&dir).map_or(true, |p| p.settings.updates.check)));
+    }
     tokio::spawn(notify::run(notifier));
     tokio::spawn(admin::recheck_loop(admin_ctx.clone()));
     tokio::spawn(metrics::flush_loop(metrics.clone(), metrics_file.clone()));

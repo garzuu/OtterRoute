@@ -9,6 +9,9 @@ Ogni opzione si può dare come flag (`--cache-dir`) o come variabile d'ambiente.
 | `OTR_HTTPS_LISTEN` | `--https-listen` | `0.0.0.0:443` | Indirizzo HTTPS pubblico. Vuoto = HTTPS disattivato. Se la porta non è disponibile il nodo parte lo stesso (senza HTTPS). |
 | `OTR_ACME_DIRECTORY` | `--acme-directory` | — | Directory ACME alternativa a Let's Encrypt (per le prove, es. Pebble). |
 | `OTR_ACME_CA_ROOT` | `--acme-ca-root` | — | File PEM con la CA radice della directory alternativa. |
+| `OTR_UPDATE_CHECK` | `--update-check` | `on` | `off` spegne ogni richiesta verso GitHub per cercare nuove versioni. |
+| `OTR_UPDATE_API` | `--update-api` | GitHub (release ufficiali) | API delle release per fork o mirror interni. |
+| `OTR_INSTALL` | `--install` | — | Come è installato il nodo (`docker` nell'immagine ufficiale): decide le istruzioni di aggiornamento. |
 | `OTR_ADMIN_LISTEN` | `--admin-listen` | `127.0.0.1:9090` | Pannello, API, `/healthz` e `/metrics`. Tienilo in locale. |
 | `OTR_CACHE_DIR` | `--cache-dir` | `./data/cache` | Cartella della cache su disco. |
 | `OTR_CACHE_MAX_BYTES` | `--cache-max-bytes` | `10737418240` (10 GiB) | Dimensione massima della cache. |

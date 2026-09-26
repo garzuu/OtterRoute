@@ -88,6 +88,30 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
     }
   };
 
+  const up = state.update;
+  const [upBusy, setUpBusy] = useState(false);
+  const [upMsg, setUpMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const upd = state.panel.settings.updates;
+  const runUp = async (fn: () => Promise<unknown>, okText: string) => {
+    setUpBusy(true);
+    setUpMsg(null);
+    try {
+      await fn();
+      await refresh();
+      setUpMsg({ ok: true, text: okText });
+    } catch (e) {
+      setUpMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setUpBusy(false);
+    }
+  };
+  const HOW: Record<string, string> = {
+    docker: "docker pull ghcr.io/garzuu/otterroute:" + (up.latest?.version ?? "VERSIONE") + "\ndocker stop otterroute && docker rm otterroute\n# rilancia lo STESSO comando run, con lo stesso volume /data",
+    service: "Scarica la release per la tua piattaforma dalla pagina delle release, sostituisci l’eseguibile e riavvia il servizio (systemctl restart otterroute).",
+    binary: "Scarica la release per la tua piattaforma dalla pagina delle release, sostituisci l’eseguibile e riavvia il nodo.",
+    source: "git pull && cargo build --release && (cd web && npm ci && npm run build)",
+  };
+
   return (
     <Page title="Impostazioni" lead="Le porte standard del nodo. Cambiale solo se il tuo ambiente lo richiede.">
       <div className="card">
@@ -194,6 +218,46 @@ export function Settings(props: { state: PanelState; refresh: () => Promise<void
               Attiva
             </button>
           )}
+        </div>
+      </div>
+      <div className="card">
+        <h2>Aggiornamenti</h2>
+        <p>
+          Versione in uso: <code>{up.current}</code> · installazione: <strong>{{ docker: "Docker", service: "servizio", binary: "binario", source: "sorgenti" }[up.kind]}</strong>
+        </p>
+        {up.available && up.latest ? (
+          <div className="box warn">
+            <strong>È disponibile la versione {up.latest.version}.</strong>{" "}
+            <a href={up.latest.url} target="_blank" rel="noreferrer">
+              Note della release ↗
+            </a>
+            {up.latest.notes && <pre className="small-text" style={{ whiteSpace: "pre-wrap", margin: "8px 0 0" }}>{up.latest.notes}</pre>}
+            <div className="small-text" style={{ marginTop: 8 }}>
+              <strong>Come aggiornare:</strong>
+              <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{HOW[up.kind]}</pre>
+              Prima fai un backup della cartella di stato. Le sessioni di accesso si perdono al riavvio.
+            </div>
+          </div>
+        ) : (
+          <div className="box good">{up.checked_at ? "Sei alla versione più recente." : "Ancora nessun controllo."}</div>
+        )}
+        {up.error && <div className="box bad">Ultimo controllo non riuscito: {up.error}</div>}
+        {up.checked_at > 0 && <p className="muted small-text">Ultimo controllo: {new Date(up.checked_at * 1000).toLocaleString("it-IT")}</p>}
+        {up.env_disabled && <div className="box">Il controllo è disattivato da <code>OTR_UPDATE_CHECK=off</code>: il nodo non contatta GitHub.</div>}
+        <label className="check">
+          <input type="checkbox" checked={upd.check} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates(e.target.checked, upd.prerelease), "Salvato.")} />
+          <span>Cerca ogni giorno le nuove versioni (una richiesta alle release pubbliche di GitHub, senza inviare dati del nodo).</span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={upd.prerelease} disabled={!canWrite || up.env_disabled || upBusy} onChange={(e) => runUp(() => api.saveUpdates(upd.check, e.target.checked), "Salvato.")} />
+          <span>Proponi anche le versioni di prova (pre-release).</span>
+        </label>
+        {upMsg && <div className={`box ${upMsg.ok ? "good" : "bad"}`}>{upMsg.text}</div>}
+        <div className="nav">
+          <span />
+          <button className="secondary" onClick={() => runUp(() => api.checkUpdate(), "Controllo eseguito.")} disabled={upBusy || !canWrite || up.env_disabled}>
+            {upBusy ? "Controllo…" : "Controlla ora"}
+          </button>
         </div>
       </div>
     </Page>

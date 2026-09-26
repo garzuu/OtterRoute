@@ -12,6 +12,9 @@ Every option can be given as a flag (`--cache-dir`) or as an environment variabl
 | `OTR_HTTPS_LISTEN` | `--https-listen` | `0.0.0.0:443` | Public HTTPS address. Empty = HTTPS disabled. If the port is not available the node still starts (without HTTPS). |
 | `OTR_ACME_DIRECTORY` | `--acme-directory` | — | ACME directory other than Let's Encrypt (for tests, e.g. Pebble). |
 | `OTR_ACME_CA_ROOT` | `--acme-ca-root` | — | PEM file with the root CA of the alternative directory. |
+| `OTR_UPDATE_CHECK` | `--update-check` | `on` | `off` turns off every request to GitHub looking for new versions. |
+| `OTR_UPDATE_API` | `--update-api` | GitHub (official releases) | Releases API for forks or internal mirrors. |
+| `OTR_INSTALL` | `--install` | — | How the node is installed (`docker` in the official image): decides the update instructions. |
 | `OTR_ADMIN_LISTEN` | `--admin-listen` | `127.0.0.1:9090` | Panel, API, `/healthz` and `/metrics`. Keep it local. |
 | `OTR_CACHE_DIR` | `--cache-dir` | `./data/cache` | Disk cache folder. |
 | `OTR_CACHE_MAX_BYTES` | `--cache-max-bytes` | `10737418240` (10 GiB) | Maximum cache size. |

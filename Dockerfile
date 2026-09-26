@@ -29,7 +29,8 @@ COPY --from=build /src/target/release/otterroute /usr/local/bin/otterroute
 COPY --from=web /web/dist /usr/share/otterroute/ui
 COPY --from=docs /docs/.vitepress/dist /usr/share/otterroute/docs
 USER otter
-ENV OTR_CACHE_DIR=/data/cache \
+ENV OTR_INSTALL=docker \
+    OTR_CACHE_DIR=/data/cache \
     OTR_STATE_DIR=/data/state \
     OTR_CONFIG=/data/config.yaml \
     OTR_UI_DIR=/usr/share/otterroute/ui \

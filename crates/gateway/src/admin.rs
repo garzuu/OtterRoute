@@ -83,6 +83,7 @@ pub struct Admin {
     pub notifier: Arc<crate::notify::Notifier>,
     pub acme: Arc<crate::acme::Acme>,
     pub gate: Arc<AdminGate>,
+    pub updater: Arc<crate::update::Updater>,
 }
 
 pub async fn handle(
@@ -154,7 +155,10 @@ pub fn access(method: &Method, path: &str) -> Option<Access> {
     Some(match (m, path) {
         ("GET", "/api/panel") => Open,
         ("GET", "/api/metrics") => Scope("metrics:read"),
-        ("PUT", "/api/settings" | "/api/https" | "/api/admin-host") => Scope("settings:write"),
+        ("PUT", "/api/settings" | "/api/https" | "/api/admin-host" | "/api/updates") => {
+            Scope("settings:write")
+        }
+        ("POST", "/api/update/check") => Scope("settings:write"),
         (
             "POST",
             "/api/domains"
@@ -255,6 +259,8 @@ async fn api(
         (&Method::PUT, "/api/settings") => with_body!(SettingsReq, save_settings),
         (&Method::POST, "/api/domains") => with_body!(HostReq, add_domain),
         (&Method::PUT, "/api/https") => with_body!(HttpsReq, save_https),
+        (&Method::PUT, "/api/updates") => with_body!(UpdatesReq, save_updates),
+        (&Method::POST, "/api/update/check") => update_check(admin, pr).await,
         (&Method::PUT, "/api/admin-host") => with_body!(AdminHostReq, set_admin_host),
         (&Method::POST, "/api/certs/issue") => with_body!(HostReq, issue_cert),
         (&Method::POST, "/api/certs/upload") => with_body!(UploadCertReq, upload_cert),
@@ -665,6 +671,7 @@ fn panel_state(admin: &Admin, pr: &Principal) -> Response<Body> {
         "recheck_verified_minutes": (admin.recheck_verified.as_secs() / 60).max(1),
         "panel": panel,
         "https_listening": state.tls.is_listening(),
+        "update": admin.updater.view(panel.settings.updates.check, panel.settings.updates.prerelease),
         "certs": certs_json(admin, &panel),
     });
     // chi non può leggere una risorsa non ne vede nemmeno l'elenco
@@ -1079,6 +1086,69 @@ async fn notifications_test(admin: &Admin, req: NotifyTestReq) -> Response<Body>
             json!({ "ok": false, "error": e, "log": admin.notifier.log() }),
         ),
     }
+}
+
+// --- aggiornamenti -----------------------------------------------------------
+
+#[derive(Deserialize)]
+struct UpdatesReq {
+    check: bool,
+    #[serde(default)]
+    prerelease: bool,
+}
+
+async fn save_updates(admin: &Admin, req: UpdatesReq) -> Response<Body> {
+    let _g = admin.write_lock.lock().await;
+    let mut p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    p.settings.updates = panel::UpdateSettings {
+        check: req.check,
+        prerelease: req.prerelease,
+    };
+    if let Err(r) = save_panel(admin, &p) {
+        return r;
+    }
+    audit::log(
+        "updates.settings",
+        &format!(
+            "controllo {}{}",
+            if req.check { "attivo" } else { "spento" },
+            if req.prerelease {
+                " · anche pre-release"
+            } else {
+                ""
+            }
+        ),
+    );
+    json(
+        StatusCode::OK,
+        admin.updater.view(req.check, req.prerelease),
+    )
+}
+
+/// «Controlla ora»: una richiesta subito, anche se il controllo periodico è spento
+/// (è l'utente a chiederlo), salvo `OTR_UPDATE_CHECK=off`.
+async fn update_check(admin: &Admin, _pr: &Principal) -> Response<Body> {
+    if crate::update::env_disabled() {
+        return bad("il controllo è disattivato da OTR_UPDATE_CHECK");
+    }
+    let p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let res = admin.updater.check().await;
+    audit::log(
+        "updates.check",
+        &res.as_ref().map_or_else(|e| e.clone(), |()| "ok".into()),
+    );
+    json(
+        StatusCode::OK,
+        admin
+            .updater
+            .view(p.settings.updates.check, p.settings.updates.prerelease),
+    )
 }
 
 // --- pannello in HTTPS --------------------------------------------------------

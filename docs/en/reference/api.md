@@ -25,7 +25,7 @@ Authentication: session cookie obtained with `POST /api/login`. Requests with a 
 | `GET /api/panel` | — |
 | `GET /api/metrics?range=1h\|24h\|7d` | `metrics:read` |
 | `PUT /api/settings` | `settings:write` |
-| `PUT /api/https`, `PUT /api/admin-host` | `settings:write` |
+| `PUT /api/https`, `PUT /api/admin-host`, `PUT /api/updates`, `POST /api/update/check` | `settings:write` |
 | `POST /api/domains`, `/api/domains/check`, `/api/domains/test`, `/api/domains/redirect` | `domains:write` |
 | `POST /api/certs/issue`, `/api/certs/upload` | `domains:write` |
 | `DELETE /api/domains/{host}` | `domains:write` |
