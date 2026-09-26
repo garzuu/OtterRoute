@@ -1,3 +1,4 @@
+mod acme;
 mod admin;
 mod admin_users;
 mod audit;
@@ -17,6 +18,7 @@ mod panel;
 mod routing;
 mod s3;
 mod sign;
+mod tls;
 mod totp;
 mod users;
 
@@ -88,6 +90,16 @@ struct Args {
         default_value = "https://garzuu.github.io/OtterRoute/"
     )]
     docs_url: String,
+    /// Indirizzo HTTPS pubblico (vuoto = HTTPS disattivato). Serve un certificato per dominio:
+    /// si ottengono in automatico dal pannello (Impostazioni → HTTPS).
+    #[arg(long, env = "OTR_HTTPS_LISTEN", default_value = "0.0.0.0:443")]
+    https_listen: String,
+    /// Directory ACME alternativa a Let's Encrypt (per le prove, es. Pebble)
+    #[arg(long, env = "OTR_ACME_DIRECTORY")]
+    acme_directory: Option<String>,
+    /// Certificato radice della CA della directory ACME alternativa
+    #[arg(long, env = "OTR_ACME_CA_ROOT")]
+    acme_ca_root: Option<PathBuf>,
     /// Indirizzo con cui si raggiunge il pannello, per il link nelle notifiche (facoltativo)
     #[arg(long, env = "OTR_PUBLIC_URL")]
     public_url: Option<String>,
@@ -125,6 +137,21 @@ async fn main() -> anyhow::Result<()> {
         "configurazione attiva"
     );
 
+    // HTTPS: certificati salvati, domini con redirect e porta pubblica dal pannello
+    let panel_now = panel::load(&args.state_dir).unwrap_or_default();
+    let tls_state = tls::Tls::new(panel_now.settings.https());
+    let loaded = tls::load_all(&args.state_dir, &tls_state.store);
+    tls_state.apply_panel(&panel_now);
+    if loaded > 0 {
+        tracing::info!(certificati = loaded, "certificati HTTPS caricati");
+    }
+    let acme = acme::Acme::new(
+        args.state_dir.clone(),
+        tls_state.clone(),
+        args.acme_directory.clone(),
+        args.acme_ca_root.clone(),
+    );
+
     let cache = Cache::open(&args.cache_dir, args.cache_max_bytes).context("apertura cache")?;
     let metrics_file = args.state_dir.join("metrics.json");
     let metrics = metrics::Metrics::load(&metrics_file);
@@ -135,6 +162,7 @@ async fn main() -> anyhow::Result<()> {
         node_id: load_node_id(&args.state_dir),
         metrics: metrics.clone(),
         signing_key: ArcSwap::from_pointee(sign::load_or_create(&args.state_dir)),
+        tls: tls_state.clone(),
     });
 
     tokio::spawn(watch_config(
@@ -166,7 +194,9 @@ async fn main() -> anyhow::Result<()> {
         write_lock: tokio::sync::Mutex::new(()),
         auth: auth::Auth::new(&args.state_dir),
         notifier: notifier.clone(),
+        acme: acme.clone(),
     });
+    tokio::spawn(acme.clone().run());
     tokio::spawn(notify::run(notifier));
     tokio::spawn(admin::recheck_loop(admin_ctx.clone()));
     tokio::spawn(metrics::flush_loop(metrics.clone(), metrics_file.clone()));
@@ -179,7 +209,35 @@ async fn main() -> anyhow::Result<()> {
         .context("bind pubblico")?;
     tracing::info!(addr = %args.listen, "gateway in ascolto");
     let st = state.clone();
-    let server = serve(public, move |req| handler::handle(st.clone(), req));
+    let server = serve(public, move |req| handler::handle(st.clone(), req, false));
+
+    // HTTPS: un errore di bind non ferma il nodo (la porta 443 può servire privilegi)
+    if !args.https_listen.trim().is_empty() {
+        match (
+            args.https_listen.parse::<SocketAddr>(),
+            tls::acceptor(tls_state.store.clone()),
+        ) {
+            (Ok(addr), Ok(acceptor)) => match TcpListener::bind(addr).await {
+                Ok(l) => {
+                    tracing::info!(addr = %addr, "HTTPS in ascolto");
+                    tls_state.set_listening(true);
+                    let st = state.clone();
+                    tokio::spawn(tls::serve(l, acceptor, move |req| {
+                        handler::handle(st.clone(), req, true)
+                    }));
+                }
+                Err(e) => {
+                    tracing::warn!(addr = %addr, error = %e, "HTTPS non attivo: porta non disponibile")
+                }
+            },
+            (Err(e), _) => {
+                tracing::warn!(error = %e, "OTR_HTTPS_LISTEN non valido: HTTPS non attivo")
+            }
+            (_, Err(e)) => {
+                tracing::warn!(error = %e, "configurazione TLS non valida: HTTPS non attivo")
+            }
+        }
+    }
 
     tokio::select! {
         _ = server => {}

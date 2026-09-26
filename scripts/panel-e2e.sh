@@ -11,7 +11,7 @@ cleanup() { for p in "${pids[@]}"; do kill "$p" 2>/dev/null; done; wait 2>/dev/n
 trap cleanup EXIT
 
 cargo build -q -p otterroute || exit 1
-GW=127.0.0.1:28301; ADMIN=127.0.0.1:29301; S3=127.0.0.1:29302
+GW=127.0.0.1:28301; ADMIN=127.0.0.1:29301; S3=127.0.0.1:29302; TLSADDR=127.0.0.1:28303
 J='Content-Type: application/json'
 pass=0; fail=0
 check() { if [[ "$2" == "$3" ]]; then pass=$((pass+1)); printf '  ok   %s\n' "$1"; else fail=$((fail+1)); printf '  FAIL %s: atteso [%s] ottenuto [%s]\n' "$1" "$2" "$3"; fi; }
@@ -26,7 +26,7 @@ mkdir -p "$work/s3/catalogo/foto"
 echo "barca" > "$work/s3/catalogo/foto/barca.jpg"
 echo "mare"  > "$work/s3/catalogo/foto/mare.jpg"
 python3 scripts/fake-s3.py --root "$work/s3" --port 29302 --access-key AK --secret-key SK & pids+=($!)
-RUST_LOG=otterroute=warn ./target/debug/otterroute --config "$work/config.yaml" --listen $GW --admin-listen $ADMIN \
+RUST_LOG=otterroute=warn ./target/debug/otterroute --config "$work/config.yaml" --listen $GW --admin-listen $ADMIN --https-listen $TLSADDR \
   --cache-dir "$work/cache" --state-dir "$work/state" --ui-dir "$work/ui" >"$work/gw.log" 2>&1 & pids+=($!)
 for _ in $(seq 60); do curl -sf $ADMIN/healthz >/dev/null && break; sleep 0.1; done
 
@@ -87,7 +87,7 @@ check "…cache e storage saltati" "skip,skip" "$(jget "','.join(s['status'] for
 d="$(dg http://img.localhost/)"
 check "percorso di cartella: fallisce all'instradamento" route "$(jget "[s for s in d['steps'] if s['status']=='fail'][0]['id']" <<<"$d")"
 d="$(dg https://img.localhost/barca.jpg)"
-check "HTTPS: avvertenza sul proxy" warn "$(jget "d['steps'][0]['status']" <<<"$d")"
+check "HTTPS senza certificato: avvertenza" warn "$(jget "d['steps'][0]['status']" <<<"$d")"
 check "indirizzo non valido" 422 "$(b='{"url":"://"}'; code $ADMIN/api/diagnose -d "$b")"
 
 echo "== link firmati"
@@ -140,12 +140,66 @@ check "disattiva i link firmati" False "$(api -X PUT "$ADMIN/api/rules/$rid" -d 
 check "di nuovo pubblico" 200 "$(st "http://$GW/barca.jpg")"
 check "instradamento inesistente" 404 "$(code -X PUT $ADMIN/api/rules/nope -d '{"signed":true}')"
 
+echo "== HTTPS"
+dgx() { local b; b="$(python3 -c 'import json,sys; print(json.dumps({"url": sys.argv[1]}))' "$1")"; api $ADMIN/api/diagnose -d "$b"; }
+cat > "$work/ssl.cnf" <<'CNF'
+[req]
+distinguished_name = dn
+x509_extensions = v3
+prompt = no
+[dn]
+CN = img.localhost
+[v3]
+subjectAltName = DNS:img.localhost
+CNF
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/k.pem" -out "$work/c.pem" -days 30 -config "$work/ssl.cnf" >/dev/null 2>&1
+up() { local b; b="$(python3 -c 'import json,sys; print(json.dumps({"host": sys.argv[1], "chain": open(sys.argv[2]).read(), "key": open(sys.argv[3]).read()}))' "$1" "$2" "$3")"; code $ADMIN/api/certs/upload -d "$b"; }
+tp=28303
+hs() { curl -s -o /dev/null -w '%{http_code}' --cacert "$work/c.pem" --resolve img.localhost:$tp:127.0.0.1 "https://img.localhost:$tp$1"; }
+check "diagnosi: HTTPS senza certificato dà un avviso" warn "$(jget "d['steps'][0]['status']" <<<"$(dgx https://img.localhost/barca.jpg)")"
+check "HTTPS senza certificato: handshake rifiutato" 000 "$(hs /barca.jpg)"
+check "carica un certificato non valido" 422 "$(echo x > "$work/junk.pem"; up img.localhost "$work/junk.pem" "$work/k.pem")"
+check "carica un certificato per un dominio non censito" 404 "$(up sconosciuto.example.com "$work/c.pem" "$work/k.pem")"
+check "carica il certificato" 200 "$(up img.localhost "$work/c.pem" "$work/k.pem")"
+check "il file della chiave è riservato (0600)" 600 "$(stat -f '%Lp' "$work/state/certs/img.localhost/privkey.pem" 2>/dev/null || stat -c '%a' "$work/state/certs/img.localhost/privkey.pem")"
+check "diagnosi: con il certificato il primo passo è ok" ok "$(jget "d['steps'][0]['status']" <<<"$(dgx https://img.localhost/barca.jpg)")"
+check "HTTPS: 200 con il certificato giusto" 200 "$(hs /barca.jpg)"
+check "HTTPS: contenuto" barca "$(curl -s --cacert "$work/c.pem" --resolve img.localhost:$tp:127.0.0.1 "https://img.localhost:$tp/barca.jpg")"
+check "HTTPS: nome senza certificato rifiutato" 000 "$(curl -s -o /dev/null -w '%{http_code}' -k --resolve altro.localhost:$tp:127.0.0.1 "https://altro.localhost:$tp/x")"
+check "il pannello sa che HTTPS è attivo" True "$(api $ADMIN/api/panel | jget "d['https_listening']")"
+check "redirect non attivabile senza certificato" 422 "$(code $ADMIN/api/domains -d '{"host":"media.localhost"}' >/dev/null; b='{"host":"media.localhost","enabled":true}'; code $ADMIN/api/domains/redirect -d "$b")"
+check "imposta la porta HTTPS pubblica" 200 "$(b='{"http_port":28301,"https_port":'$tp'}'; code -X PUT $ADMIN/api/settings -d "$b")"
+check "attiva il redirect a HTTPS" 200 "$(b='{"host":"img.localhost","enabled":true}'; code $ADMIN/api/domains/redirect -d "$b")"
+check "HTTP: 308" 308 "$(st "http://$GW/barca.jpg?x=1")"
+check "…verso HTTPS con percorso e query" "https://img.localhost:$tp/barca.jpg?x=1" "$(curl -s -o /dev/null -D - -H 'Host: img.localhost' "http://$GW/barca.jpg?x=1" | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')"
+check "la prova di verifica del dominio resta in HTTP" 200 "$(st "http://$GW/.well-known/otterroute/check?nonce=abc")"
+check "sfida ACME sconosciuta: 404 e niente redirect" 404 "$(st "http://$GW/.well-known/acme-challenge/token-che-non-esiste")"
+check "HTTPS non viene reindirizzato" 200 "$(hs /barca.jpg)"
+check "un altro dominio non viene reindirizzato" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: media.localhost' "http://$GW/barca.jpg")"
+check "disattiva il redirect" 200 "$(b='{"host":"img.localhost","enabled":false}'; code $ADMIN/api/domains/redirect -d "$b")"
+check "HTTP di nuovo servito" 200 "$(st "http://$GW/barca.jpg")"
+check "email non valida rifiutata" 422 "$(b='{"enabled":true,"email":"non-una-mail"}'; code -X PUT $ADMIN/api/https -d "$b")"
+check "certificati automatici: emissione con la funzione spenta" 422 "$(b='{"host":"img.localhost"}'; code $ADMIN/api/certs/issue -d "$b")"
+check "attiva i certificati automatici (staging)" True "$(b='{"enabled":true,"email":"admin@example.com","staging":true}'; api -X PUT $ADMIN/api/https -d "$b" | jget "d['enabled'] and d['staging']")"
+check "emissione per un dominio locale rifiutata" 422 "$(b='{"host":"img.localhost"}'; code $ADMIN/api/certs/issue -d "$b")"
+check "le impostazioni restano salvate" admin@example.com "$(api $ADMIN/api/panel | jget "d['panel']['settings']['acme']['email']")"
+check "spegne i certificati automatici" False "$(b='{"enabled":false}'; api -X PUT $ADMIN/api/https -d "$b" | jget "str(d['enabled'])")"
+kill "${pids[1]}" 2>/dev/null; wait "${pids[1]}" 2>/dev/null
+RUST_LOG=otterroute=warn ./target/debug/otterroute --config "$work/config.yaml" --listen $GW --admin-listen $ADMIN --https-listen $TLSADDR \
+  --cache-dir "$work/cache" --state-dir "$work/state" --ui-dir "$work/ui" >>"$work/gw.log" 2>&1 & pids[1]=$!
+for _ in $(seq 60); do curl -sf $ADMIN/healthz >/dev/null && break; sleep 0.1; done
+check "riavvio: il certificato si ricarica da disco" 200 "$(hs /barca.jpg)"
+rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"admin","password":"password-admin-1"}' >/dev/null
+
 echo "== permessi"
 api $ADMIN/api/users -d '{"username":"lettore","role":"viewer","password":"password-lettore-1"}' >/dev/null
 rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"lettore","password":"password-lettore-1"}' >/dev/null
 api -X PUT $ADMIN/api/me/password -d '{"current":"password-lettore-1","new":"password-lettore-2"}' >/dev/null  # la temporanea va cambiata al primo accesso
 check "sola lettura: niente purge" 403 "$(b="$(pj rule "$rid")"; code $ADMIN/api/purge -d "$b")"
 check "sola lettura: può fare la diagnosi" 200 "$(b='{"url":"http://img.localhost/barca.jpg"}'; code $ADMIN/api/diagnose -d "$b")"
+check "sola lettura: niente HTTPS automatico" 403 "$(b='{"enabled":true}'; code -X PUT $ADMIN/api/https -d "$b")"
+check "sola lettura: niente caricamento certificati" 403 "$(b='{"host":"img.localhost","chain":"x","key":"y"}'; code $ADMIN/api/certs/upload -d "$b")"
+check "sola lettura: niente redirect" 403 "$(b='{"host":"img.localhost","enabled":true}'; code $ADMIN/api/domains/redirect -d "$b")"
 check "sola lettura: niente link" 403 "$(b='{"rule":"x","path":"/a","ttl_secs":60}'; code $ADMIN/api/links -d "$b")"
 check "sola lettura: non ruota la chiave" 403 "$(code $ADMIN/api/links/rotate -d '{}')"
 check "sola lettura: non attiva i link firmati" 403 "$(code -X PUT $ADMIN/api/rules/$rid -d '{"signed":true}')"

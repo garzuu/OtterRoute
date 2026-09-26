@@ -34,7 +34,9 @@ A scope `x:write` always includes `x:read`.
 | `GET /api/panel` | none (the data shown depends on the read scopes) |
 | `GET /api/metrics` | `metrics:read` |
 | `PUT /api/settings` | `settings:write` |
-| `POST /api/domains`, `/api/domains/check`, `/api/domains/test` | `domains:write` |
+| `PUT /api/https` | `settings:write` |
+| `POST /api/domains`, `/api/domains/check`, `/api/domains/test`, `/api/domains/redirect` | `domains:write` |
+| `POST /api/certs/issue`, `/api/certs/upload` | `domains:write` |
 | `DELETE /api/domains/{host}` | `domains:write` |
 | `POST /api/buckets`, `/api/buckets/check`, `/api/buckets/test` | `buckets:write` |
 | `DELETE /api/buckets/{id}` | `buckets:write` |

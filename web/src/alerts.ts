@@ -42,6 +42,20 @@ export function buildAlerts(s: PanelState, can: (scope: string) => boolean): Ale
       text: "L’ultimo invio è fallito: controlla le impostazioni e premi «Invia prova».",
       page: "notifications",
     });
+  const now = Date.now() / 1000;
+  if (s.panel.settings.acme.enabled)
+    for (const c of can("domains:read") ? s.certs : []) {
+      if (c.status === "expired" || (c.status === "expiring" && c.not_after && c.not_after > now))
+        out.push({
+          id: `c:${c.host}`,
+          level: c.status === "expired" ? "error" : "warn",
+          title: `${c.status === "expired" ? "Certificato scaduto" : "Certificato in scadenza"} · ${c.host}`,
+          text: c.status === "expired" ? "Il certificato HTTPS è scaduto e il rinnovo non è riuscito." : "Scade tra meno di 14 giorni: il rinnovo automatico non è ancora riuscito.",
+          page: "domains",
+        });
+      else if (c.status === "error")
+        out.push({ id: `c:${c.host}`, level: "warn", title: `Certificato non emesso · ${c.host}`, text: c.error?.message ?? "", page: "domains" });
+    }
   for (const d of can("domains:read") ? s.panel.domains : []) {
     const st = domainStatus(d);
     if (st === "verified") continue;

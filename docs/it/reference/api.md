@@ -22,7 +22,9 @@ Autenticazione: cookie di sessione ottenuto con `POST /api/login`. Le richieste 
 | `GET /api/panel` | — |
 | `GET /api/metrics?range=1h\|24h\|7d` | `metrics:read` |
 | `PUT /api/settings` | `settings:write` |
-| `POST /api/domains`, `/api/domains/check`, `/api/domains/test` | `domains:write` |
+| `PUT /api/https` | `settings:write` |
+| `POST /api/domains`, `/api/domains/check`, `/api/domains/test`, `/api/domains/redirect` | `domains:write` |
+| `POST /api/certs/issue`, `/api/certs/upload` | `domains:write` |
 | `DELETE /api/domains/{host}` | `domains:write` |
 | `POST /api/buckets`, `/api/buckets/check`, `/api/buckets/test` | `buckets:write` |
 | `DELETE /api/buckets/{id}` | `buckets:write` |

@@ -69,7 +69,7 @@ fn domain_state(d: &panel::Domain) -> &'static str {
 }
 
 /// Tutto ciò che oggi richiede attenzione. Regole e testi allineati alla campanella.
-pub fn problems(p: &Panel) -> Vec<Problem> {
+pub fn problems(p: &Panel, certs: &[crate::tls::CertInfo], now: u64) -> Vec<Problem> {
     let mut out = Vec::new();
     for d in &p.domains {
         let st = domain_state(d);
@@ -97,6 +97,46 @@ pub fn problems(p: &Panel) -> Vec<Problem> {
             title: format!("{title} · {}", d.host),
             text: d.message.clone(),
         });
+    }
+    // certificati automatici: scaduti, in scadenza o non emessi
+    if p.settings.acme.enabled {
+        for d in p
+            .domains
+            .iter()
+            .filter(|d| d.verified && crate::acme::certifiable(&d.host))
+        {
+            let Some(info) = certs.iter().find(|c| c.host == d.host) else {
+                continue;
+            };
+            let (level, title, text) = match crate::tls::status(info, now) {
+                "expired" => (
+                    Level::Error,
+                    "Certificato scaduto",
+                    "Il certificato HTTPS è scaduto e il rinnovo non è riuscito.".to_owned(),
+                ),
+                "expiring" => (
+                    Level::Warn,
+                    "Certificato in scadenza",
+                    "Scade tra meno di 14 giorni: il rinnovo automatico non è ancora riuscito."
+                        .to_owned(),
+                ),
+                "error" => (
+                    Level::Warn,
+                    "Certificato non emesso",
+                    info.error
+                        .as_ref()
+                        .map(|e| e.message.clone())
+                        .unwrap_or_default(),
+                ),
+                _ => continue,
+            };
+            out.push(Problem {
+                id: format!("c:{}", d.host),
+                level,
+                title: format!("{title} · {}", d.host),
+                text,
+            });
+        }
     }
     for b in &p.buckets {
         let mk = |level, title: &str, text: String| Problem {
@@ -665,7 +705,12 @@ impl Notifier {
             return;
         };
         let mut state: State = read_json(&state_path(&self.state_dir)).unwrap_or_default();
-        let events = plan(&mut state, &problems(&panel), &cfg, t);
+        let certs: Vec<crate::tls::CertInfo> = panel
+            .domains
+            .iter()
+            .map(|d| crate::tls::read_info(&self.state_dir, &d.host))
+            .collect();
+        let events = plan(&mut state, &problems(&panel, &certs, t), &cfg, t);
         if let Ok(data) = serde_json::to_vec_pretty(&state) {
             let _ = crate::admin::write_atomic(&state_path(&self.state_dir), &data, false);
         }
@@ -715,6 +760,7 @@ mod tests {
                 .collect(),
             ever_verified: ever,
             since: None,
+            redirect_https: false,
         }
     }
 
@@ -755,7 +801,10 @@ mod tests {
             ],
             ..Panel::default()
         };
-        let got: Vec<(String, Level)> = problems(&p).into_iter().map(|x| (x.id, x.level)).collect();
+        let got: Vec<(String, Level)> = problems(&p, &[], 0)
+            .into_iter()
+            .map(|x| (x.id, x.level))
+            .collect();
         let want = [
             ("d:new.it", Level::Warn),
             ("d:lost.it", Level::Error),
@@ -766,11 +815,51 @@ mod tests {
             ("b:nofile", Level::Warn),
         ];
         assert_eq!(got, want.map(|(i, l)| (i.to_string(), l)));
-        let noreach = problems(&p)
+        let noreach = problems(&p, &[], 0)
             .into_iter()
             .find(|x| x.id == "d:noreach.it")
             .unwrap();
         assert!(noreach.title.starts_with("Il nodo non risponde"));
+    }
+
+    #[test]
+    fn certificate_problems() {
+        use crate::tls::{CertError, CertInfo};
+        let mut p = Panel {
+            domains: vec![domain("cdn.example.com", true, true, &[])],
+            ..Panel::default()
+        };
+        let now = 1_000_000_000;
+        let info = |na: Option<u64>, err: Option<&str>| CertInfo {
+            host: "cdn.example.com".into(),
+            not_after: na,
+            issued_at: na.map(|_| 1),
+            error: err.map(|m| CertError {
+                at: now,
+                message: m.into(),
+            }),
+        };
+        // certificati automatici spenti: nessun avviso
+        assert!(problems(&p, &[info(Some(now - 1), None)], now).is_empty());
+        p.settings.acme.enabled = true;
+        let one = |i: CertInfo| problems(&p, &[i], now);
+        assert!(one(info(Some(now + 40 * 86400), None)).is_empty(), "valido");
+        assert!(
+            one(info(None, None)).is_empty(),
+            "non ancora emesso, nessun errore: si aspetta"
+        );
+        let expiring = one(info(Some(now + 5 * 86400), None));
+        assert_eq!(
+            (expiring[0].id.as_str(), expiring[0].level),
+            ("c:cdn.example.com", Level::Warn)
+        );
+        assert_eq!(one(info(Some(now - 10), None))[0].level, Level::Error);
+        let failed = one(info(None, Some("la CA ha rifiutato")));
+        assert_eq!(failed[0].level, Level::Warn);
+        assert!(failed[0].text.contains("rifiutato"));
+        // domini non certificabili (locali) e non verificati non generano avvisi
+        p.domains = vec![domain("img.localhost", true, true, &[])];
+        assert!(problems(&p, &[], now).is_empty());
     }
 
     fn prob(id: &str, level: Level) -> Problem {

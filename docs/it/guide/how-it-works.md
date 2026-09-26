@@ -24,7 +24,7 @@ visitatore ──► DNS ──► [proxy / CDN / load balancer] ──► Otter
 
 | Parte | Dove | Cosa fa |
 |---|---|---|
-| **Gateway pubblico** | porta **80** (HTTP) | Serve i file ai visitatori. `443` (HTTPS) è riservata ma non ancora servita: vedi [HTTPS e proxy](./https-proxy). |
+| **Gateway pubblico** | porta **80** (HTTP) | Serve i file ai visitatori. Con i certificati automatici serve anche **HTTPS** sulla 443: vedi [HTTPS automatico](./https) (oppure [HTTPS e proxy](./https-proxy)). |
 | **Pannello e API** | porta **9090**, solo `localhost` | Domini, bucket, instradamenti, utenti, statistiche. Non va mai esposto. |
 | **Cache** | cartella su disco | Copie dei file, con limite di spazio (LRU). |
 | **Stato** | cartella su disco | Utenti, configurazione generata, credenziali, statistiche, registro attività. |
@@ -37,7 +37,7 @@ Il pannello non è un accessorio: **genera** la configurazione del gateway (`con
 - ✅ Verifica che i domini arrivino davvero al nodo e ricontrolla nel tempo.
 - ✅ Mostra statistiche e le espone a Prometheus.
 - ❌ **Solo lettura**: accetta `GET` e `HEAD`, nessuna scrittura verso lo storage.
-- ❌ **Niente HTTPS integrato**: si mette un proxy davanti (Caddy, nginx, Traefik, Cloudflare).
+- ✅ **HTTPS integrato** con certificati gratuiti che si rinnovano da soli (sfida HTTP-01), oppure un proxy davanti (Caddy, nginx, Traefik, Cloudflare).
 - ❌ **Niente elenco delle cartelle**: `/cartella/` risponde `404`, non c'è `index.html` automatico.
 - ❌ La **query string non arriva mai allo storage** e non entra nella chiave di cache, salvo i parametri che una politica di cache ammette.
 

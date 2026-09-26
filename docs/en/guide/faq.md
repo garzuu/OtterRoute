@@ -4,7 +4,7 @@ source_commit: dd1d866
 # Frequently asked questions
 
 **Does OtterRoute also serve HTTPS?**
-Not directly: put a proxy or CDN in front. → [HTTPS and proxy](./https-proxy)
+Yes: with automatic certificates (Let's Encrypt) or with your own certificate. → [Automatic HTTPS](./https). If you prefer a proxy or a CDN, see [HTTPS and proxy](./https-proxy).
 
 **Can I use several domains on the same bucket?**
 Yes: you create several routes (one per domain) to the same destination.

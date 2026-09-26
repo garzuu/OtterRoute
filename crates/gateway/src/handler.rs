@@ -46,6 +46,8 @@ pub struct AppState {
     pub metrics: Arc<crate::metrics::Metrics>,
     /// chiave dei link firmati (si può ruotare dal pannello)
     pub signing_key: ArcSwap<Vec<u8>>,
+    /// HTTPS: sfide ACME, certificati e redirect
+    pub tls: Arc<crate::tls::Tls>,
 }
 
 struct Ctx {
@@ -125,12 +127,13 @@ const BAD_GATEWAY: HttpError = HttpError(StatusCode::BAD_GATEWAY, "bad gateway")
 pub async fn handle(
     state: Arc<AppState>,
     req: http::Request<Incoming>,
+    secure: bool,
 ) -> Result<Response<Body>, Infallible> {
     let t0 = Instant::now();
     let (parts, _) = req.into_parts();
     let tag = Arc::new(crate::metrics::ReqTag::default());
     let resp = crate::metrics::scope(tag.clone(), async {
-        match handle_inner(&state, &parts).await {
+        match handle_inner(&state, &parts, secure).await {
             Ok(r) => r,
             Err(e) => e.into_response(),
         }
@@ -151,8 +154,8 @@ pub async fn handle(
         ms,
         "request"
     );
-    // i controlli dei domini fatti dal pannello non sono traffico
-    if parts.uri.path() == crate::dns::CHECK_PATH {
+    // i controlli dei domini e le sfide ACME non sono traffico
+    if parts.uri.path() == crate::dns::CHECK_PATH || parts.uri.path().starts_with(ACME_PREFIX) {
         return Ok(resp);
     }
     let sample = crate::metrics::RequestSample::new(
@@ -194,9 +197,41 @@ fn node_proof(state: &AppState, parts: &http::request::Parts) -> Response<Body> 
     r
 }
 
+const ACME_PREFIX: &str = "/.well-known/acme-challenge/";
+
+/// Risposta alla sfida HTTP-01 della CA: vale per qualsiasi host, prima delle regole.
+fn acme_challenge(state: &AppState, token: &str) -> Response<Body> {
+    let ok_token = !token.is_empty()
+        && token.len() <= 128
+        && token
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    match ok_token
+        .then(|| state.tls.challenge_response(token))
+        .flatten()
+    {
+        Some(v) => {
+            let mut r = Response::new(body::full(v));
+            r.headers_mut().insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/plain; charset=utf-8"),
+            );
+            r.headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            r
+        }
+        None => {
+            let mut r = Response::new(body::full("not found"));
+            *r.status_mut() = StatusCode::NOT_FOUND;
+            r
+        }
+    }
+}
+
 async fn handle_inner(
     state: &Arc<AppState>,
     parts: &http::request::Parts,
+    secure: bool,
 ) -> Result<Response<Body>, HttpError> {
     if parts.method != Method::GET && parts.method != Method::HEAD {
         return Err(HttpError(
@@ -207,7 +242,23 @@ async fn handle_inner(
     if parts.uri.path() == crate::dns::CHECK_PATH {
         return Ok(node_proof(state, parts));
     }
+    if let Some(token) = parts.uri.path().strip_prefix(ACME_PREFIX) {
+        return Ok(acme_challenge(state, token));
+    }
     let host = request_host(parts).ok_or(HttpError(StatusCode::BAD_REQUEST, "bad host"))?;
+    // HTTP → HTTPS, solo per i domini che lo chiedono e hanno un certificato
+    if !secure && state.tls.wants_redirect(&host) {
+        let pq = parts
+            .uri
+            .path_and_query()
+            .map_or("/", http::uri::PathAndQuery::as_str);
+        let mut r = Response::new(body::full(""));
+        *r.status_mut() = StatusCode::PERMANENT_REDIRECT;
+        if let Ok(v) = HeaderValue::from_str(&state.tls.https_location(&host, pq)) {
+            r.headers_mut().insert(header::LOCATION, v);
+        }
+        return Ok(r);
+    }
     let path = normalize_path(parts.uri.path())
         .map_err(|_| HttpError(StatusCode::BAD_REQUEST, "bad path"))?;
 

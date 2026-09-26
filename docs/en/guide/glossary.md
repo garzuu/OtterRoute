@@ -15,6 +15,8 @@ source_commit: dd1d866
 
 **Domain** — public name that points to the node.
 
+**ACME / HTTP-01** — protocol with which a CA (Let's Encrypt) issues certificates; the HTTP-01 challenge verifies the domain with a request on port 80. → [Automatic HTTPS](./https)
+
 **Endpoint** — address of the S3 service (`https://s3.example.com`).
 
 **Route** — rule *domain + prefix → destination + cache policy*.

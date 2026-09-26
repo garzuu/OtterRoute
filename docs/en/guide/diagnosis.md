@@ -12,7 +12,7 @@ When a file does not open, the **Diagnosis** page follows the request's path and
 
 | Step | What it checks | If it fails |
 |---|---|---|
-| **Address** | That it is a valid URL. With `https://` it warns that the node answers only over HTTP and that HTTPS depends on a proxy. | Fix the address. |
+| **Address** | That it is a valid URL. With `https://` it checks that the node has a certificate for the domain and is listening for HTTPS; otherwise it warns that HTTPS depends on a proxy in front. | Fix the address. |
 | **The domain reaches this node** | The same check as domain verification: the name resolves and an HTTP request to the domain reaches *this* node. It warns if the domain works but is not a registered domain. | DNS records, firewall, proxy: see [Domains and DNS](./domains-dns). |
 | **Route** | Which rule serves the path (the longest prefix wins) and which file it looks for in the bucket. If there is none, it lists the domain's prefixes. | Create the route or use an existing prefix. A path ending in `/` is a folder: it is not listed. |
 | **Cache** | Whether the file is already in cache, fresh or expired, or whether a "not found" is remembered. | If the file now exists, wait for the negative cache or [purge it](./cache). |

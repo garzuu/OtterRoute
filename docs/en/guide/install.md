@@ -64,7 +64,7 @@ WantedBy=multi-user.target
 | Port | Use | Changed with |
 |---|---|---|
 | **80** | Public HTTP (domains arrive here) | `OTR_LISTEN` for listening; **Settings → HTTP** for the port used in checks |
-| **443** | HTTPS: reserved, not served yet | Settings → HTTPS |
+| **443** | HTTPS (with [automatic certificates](./https)) | `OTR_HTTPS_LISTEN` for listening; Settings → Ports for the port used in redirects |
 | **9090** | Panel and API, localhost only | `OTR_ADMIN_LISTEN` |
 
 All options are in the [environment variables reference](/en/reference/environment).

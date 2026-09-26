@@ -1,8 +1,87 @@
 import { useState } from "react";
-import { api, domainStatus, type CheckResult, type DomainInfo, type PanelState } from "../api";
+import { api, domainStatus, type CertInfo, type CheckResult, type DomainInfo, type PanelState } from "../api";
 import { useAuth } from "../auth";
 import { DataTable, type Column } from "../DataTable";
 import { DeleteButton, EmptyState, Field, Illus, Modal, Page, Stages, fmtTime } from "../ui";
+
+const CERT_BADGE: Record<CertInfo["status"], { cls: string; label: string }> = {
+  valid: { cls: "badge good", label: "Valido" },
+  expiring: { cls: "badge warn", label: "In scadenza" },
+  expired: { cls: "badge bad", label: "Scaduto" },
+  missing: { cls: "badge", label: "Non emesso" },
+  error: { cls: "badge bad", label: "Errore" },
+  issuing: { cls: "badge warn", label: "In emissione" },
+};
+
+const fmtDay = (unix: number) => new Date(unix * 1000).toLocaleDateString("it-IT");
+
+/** Certificato HTTPS di un dominio, redirect e caricamento manuale. */
+function HttpsPanel(props: { d: DomainInfo; cert: CertInfo | undefined; auto: boolean; canWrite: boolean; run: (key: string, fn: () => Promise<unknown>) => Promise<void>; busy: string | null }) {
+  const { d, cert, auto, canWrite, run, busy } = props;
+  const [chain, setChain] = useState("");
+  const [key, setKey] = useState("");
+  const [open, setOpen] = useState(false);
+  const serving = cert?.serving ?? false;
+  return (
+    <div className="details">
+      <strong>HTTPS</strong>
+      {cert ? (
+        <div>
+          <span className={CERT_BADGE[cert.status].cls}>{CERT_BADGE[cert.status].label}</span>{" "}
+          {cert.not_after && <span className="muted">scade il {fmtDay(cert.not_after)}</span>}
+          {cert.error && <div className="box bad">{cert.error.message}</div>}
+        </div>
+      ) : (
+        <div className="muted">Un certificato pubblico non è possibile per questo nome (dominio locale o indirizzo IP).</div>
+      )}
+      {!auto && <div className="muted">I certificati automatici sono spenti: attivali in Impostazioni → HTTPS, oppure carica un certificato tuo.</div>}
+      {canWrite && (
+        <div className="inline tight">
+          {auto && cert && d.verified && (
+            <button className="secondary small" disabled={busy === `cert:${d.host}` || cert.status === "issuing"} onClick={() => run(`cert:${d.host}`, () => api.issueCert(d.host))}>
+              {cert.status === "issuing" ? "In emissione…" : serving ? "Rinnova ora" : "Richiedi certificato"}
+            </button>
+          )}
+          <button className="ghost small" onClick={() => setOpen(!open)}>
+            {open ? "Chiudi" : "Carica un certificato"}
+          </button>
+        </div>
+      )}
+      {canWrite && (
+        <label className="check">
+          <input type="checkbox" checked={d.redirect_https} disabled={(!serving && !d.redirect_https) || busy === `redir:${d.host}`} onChange={(e) => run(`redir:${d.host}`, () => api.setRedirect(d.host, e.target.checked))} />
+          <span>
+            Reindirizza l’HTTP a HTTPS per questo dominio {serving ? "" : "(disponibile dopo aver ottenuto un certificato)"}. La verifica del dominio resta in HTTP.
+          </span>
+        </label>
+      )}
+      {open && canWrite && (
+        <div>
+          <Field label="Certificato e catena (PEM)">
+            <textarea rows={4} value={chain} onChange={(e) => setChain(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----" spellCheck={false} />
+          </Field>
+          <Field label="Chiave privata (PEM)" hint="Resta su questo nodo, in un file leggibile solo dal proprietario.">
+            <textarea rows={4} value={key} onChange={(e) => setKey(e.target.value)} placeholder="-----BEGIN PRIVATE KEY-----" spellCheck={false} />
+          </Field>
+          <button
+            className="secondary small"
+            disabled={!chain.trim() || !key.trim() || busy === `up:${d.host}`}
+            onClick={() =>
+              run(`up:${d.host}`, async () => {
+                await api.uploadCert(d.host, chain, key);
+                setChain("");
+                setKey("");
+                setOpen(false);
+              })
+            }
+          >
+            Carica
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const isLocal = (h: string) => h === "localhost" || h.endsWith(".localhost");
 
@@ -58,6 +137,8 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
     }
   };
 
+  const certOf = (host: string) => state.certs.find((c) => c.host === host);
+  const auto = state.panel.settings.acme.enabled;
   const columns: Column<DomainInfo>[] = [
     {
       key: "host",
@@ -72,6 +153,21 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
       render: (d) => {
         const b = DOMAIN_BADGE[domainStatus(d)];
         return <span className={b.cls}>{b.label}</span>;
+      },
+    },
+    {
+      key: "https",
+      header: "HTTPS",
+      sort: (d) => certOf(d.host)?.status ?? "",
+      render: (d) => {
+        const c = certOf(d.host);
+        if (!c) return <span className="muted">—</span>;
+        const b = CERT_BADGE[c.status];
+        return (
+          <span className={b.cls} title={c.not_after ? `Scade il ${fmtDay(c.not_after)}` : undefined}>
+            {b.label}
+          </span>
+        );
       },
     },
     {
@@ -142,6 +238,7 @@ export function Domains(props: { state: PanelState; refresh: () => Promise<void>
                 )}
                 {d.stages.length > 0 ? <Stages stages={d.stages} /> : <div className="muted">{d.message}</div>}
                 {!d.verified && <Hint host={d.host} port={state.http_port} />}
+                <HttpsPanel d={d} cert={certOf(d.host)} auto={auto} canWrite={canWrite} run={run} busy={busy} />
               </div>
             );
           }}

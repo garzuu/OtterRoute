@@ -9,7 +9,7 @@ Quando un file non si apre, la pagina **Diagnosi** segue il percorso della richi
 
 | Passaggio | Cosa controlla | Se fallisce |
 |---|---|---|
-| **Indirizzo** | Che sia un URL valido. Con `https://` avvisa che il nodo risponde solo in HTTP e che HTTPS dipende da un proxy. | Correggi l'indirizzo. |
+| **Indirizzo** | Che sia un URL valido. Con `https://` controlla che il nodo abbia un certificato per il dominio e sia in ascolto su HTTPS; altrimenti avvisa che HTTPS dipende da un proxy davanti. | Correggi l'indirizzo. |
 | **Il dominio arriva a questo nodo** | La stessa verifica dei domini: il nome risolve e una richiesta HTTP al dominio raggiunge *questo* nodo. Avvisa se il dominio funziona ma non è censito. | Record DNS, firewall, proxy: vedi [Domini e DNS](./domains-dns). |
 | **Instradamento** | Quale regola serve il percorso (vince il prefisso più lungo) e quale file cerca nel bucket. Se non c'è, elenca i prefissi del dominio. | Crea l'instradamento o usa un prefisso esistente. Un percorso che finisce con `/` è una cartella: non si elenca. |
 | **Cache** | Se il file è già in cache, fresco o scaduto, o se c'è un «non trovato» ricordato. | Se il file ora esiste, attendi la cache negativa o [svuotala](./cache). |

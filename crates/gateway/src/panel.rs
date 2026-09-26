@@ -34,6 +34,22 @@ pub struct Settings {
     pub http_port: Option<u16>,
     #[serde(default)]
     pub https_port: Option<u16>,
+    /// certificati HTTPS automatici
+    #[serde(default)]
+    pub acme: AcmeSettings,
+}
+
+/// Certificati automatici (ACME): con `enabled` il nodo li ottiene e li rinnova da solo.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct AcmeSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    /// contatto per la CA (scadenze, problemi): facoltativo
+    #[serde(default)]
+    pub email: String,
+    /// usa l'ambiente di prova di Let's Encrypt (certificati non validi nei browser)
+    #[serde(default)]
+    pub staging: bool,
 }
 
 impl Settings {
@@ -65,6 +81,9 @@ pub struct Domain {
     /// da quando lo stato (verificato / non verificato) è quello attuale
     #[serde(default)]
     pub since: Option<String>,
+    /// l'HTTP risponde con un redirect a HTTPS (serve un certificato valido)
+    #[serde(default)]
+    pub redirect_https: bool,
 }
 
 impl Domain {
@@ -277,6 +296,7 @@ mod tests {
             stages: vec![],
             ever_verified: false,
             since: None,
+            redirect_https: false,
         };
         // mai verificato: resta "in attesa", non è un errore
         d.apply(result(false));
