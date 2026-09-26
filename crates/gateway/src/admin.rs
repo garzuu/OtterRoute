@@ -26,6 +26,7 @@ use crate::dns;
 use crate::handler::AppState;
 use crate::panel::{self, Bucket, BucketCheck, Domain, Panel, Rule};
 use crate::s3;
+use crate::sign;
 
 const MAX_BODY: usize = 64 * 1024;
 pub struct Admin {
@@ -128,7 +129,9 @@ pub fn access(method: &Method, path: &str) -> Option<Access> {
         }
         ("DELETE", p) if p.starts_with("/api/buckets/") => Scope("buckets:write"),
         ("POST", "/api/rules") => Scope("routes:write"),
-        ("DELETE", p) if p.starts_with("/api/rules/") => Scope("routes:write"),
+        ("DELETE" | "PUT", p) if p.starts_with("/api/rules/") => Scope("routes:write"),
+        ("POST", "/api/links") => Scope("routes:write"),
+        ("POST", "/api/links/rotate") => Scope("settings:write"),
         ("POST", "/api/probe") => Scope("routes:read"),
         ("POST", "/api/purge" | "/api/warm") => Scope("routes:write"),
         ("POST", "/api/diagnose") => Scope("routes:read"),
@@ -219,6 +222,15 @@ async fn api(
         },
         (&Method::POST, "/api/buckets") => with_body!(BucketReq, add_bucket),
         (&Method::POST, "/api/rules") => with_body!(RuleReq, add_rule),
+        (&Method::PUT, p) if p.starts_with("/api/rules/") => {
+            let id = p["/api/rules/".len()..].to_owned();
+            match read_json::<RuleSignedReq>(req).await {
+                Ok(b) => set_rule_signed(admin, &id, b).await,
+                Err(r) => r,
+            }
+        }
+        (&Method::POST, "/api/links") => with_body!(LinkReq, create_link),
+        (&Method::POST, "/api/links/rotate") => rotate_links(admin).await,
         (&Method::POST, "/api/probe") => with_body!(ProbeReq, probe),
         (&Method::POST, "/api/diagnose") => with_body!(DiagnoseReq, diagnose),
         (&Method::POST, "/api/purge") => with_body!(PurgeReq, purge),
@@ -1397,6 +1409,8 @@ struct RuleReq {
     bucket_id: String,
     #[serde(default)]
     folder: String,
+    #[serde(default)]
+    signed: bool,
 }
 
 fn default_path_prefix() -> String {
@@ -1443,6 +1457,7 @@ async fn add_rule(admin: &Admin, req: RuleReq) -> Response<Body> {
         bucket_id: req.bucket_id,
         folder,
         cache_generation: 1,
+        signed: req.signed,
     };
     p.rules.push(rule.clone());
     if let Err(e) = apply_config(admin, &p) {
@@ -1477,6 +1492,153 @@ async fn delete_rule(admin: &Admin, id: &str) -> Response<Body> {
     }
     audit::log("rule.delete", id);
     json(StatusCode::OK, json!({"ok": true}))
+}
+
+// ---------------------------------------------------------------------------
+// Link firmati
+// ---------------------------------------------------------------------------
+
+/// `?exp=…&sig=…` per le richieste che il nodo fa a se stesso (prova, precarica,
+/// diagnosi) verso un instradamento che richiede link firmati; vuoto altrimenti.
+fn own_query(admin: &Admin, host: &str, path: &str) -> String {
+    let snap = admin.state.snapshot.load_full();
+    let Some(route) = snap.match_route(host, path) else {
+        return String::new();
+    };
+    if !route.signed {
+        return String::new();
+    }
+    let exp = sign::now_secs() + 120;
+    format!(
+        "?{}",
+        sign::query(&admin.state.signing_key.load(), host, path, exp)
+    )
+}
+
+#[derive(Deserialize)]
+struct RuleSignedReq {
+    signed: bool,
+}
+
+async fn set_rule_signed(admin: &Admin, id: &str, req: RuleSignedReq) -> Response<Body> {
+    let _g = admin.write_lock.lock().await;
+    if let Err(r) = guard_hand_managed(admin) {
+        return r;
+    }
+    let mut p = match load_panel(admin) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let Some(rule) = p.rules.iter_mut().find(|r| r.id == id) else {
+        return error(StatusCode::NOT_FOUND, "instradamento non trovato");
+    };
+    rule.signed = req.signed;
+    // i file già in cache non devono restare accessibili senza link (né viceversa)
+    rule.cache_generation += 1;
+    let label = format!("{}{}", rule.domain, rule.path_prefix);
+    if let Err(e) = apply_config(admin, &p) {
+        return error(StatusCode::INTERNAL_SERVER_ERROR, e);
+    }
+    if let Err(r) = save_panel(admin, &p) {
+        return r;
+    }
+    audit::log(
+        "rule.signed",
+        &format!(
+            "{label} · {}",
+            if req.signed {
+                "link firmati"
+            } else {
+                "pubblico"
+            }
+        ),
+    );
+    json(StatusCode::OK, json!({ "id": id, "signed": req.signed }))
+}
+
+#[derive(Deserialize)]
+struct LinkReq {
+    rule: String,
+    /// percorso come lo chiede un visitatore, es. `/foto/barca.jpg`
+    path: String,
+    /// validità in secondi (da 1 secondo a 365 giorni)
+    ttl_secs: u64,
+    #[serde(default)]
+    https: bool,
+}
+
+async fn create_link(admin: &Admin, req: LinkReq) -> Response<Body> {
+    if req.ttl_secs == 0 || req.ttl_secs > sign::MAX_TTL_SECS {
+        return bad("la validità deve andare da 1 secondo a 365 giorni");
+    }
+    let path = match visitor_path(&req.path) {
+        Ok(p) => p,
+        Err(e) => return bad(e),
+    };
+    let snap = admin.state.snapshot.load_full();
+    let Some(route) = snap
+        .routes_by_host
+        .values()
+        .flatten()
+        .find(|r| r.id == req.rule)
+    else {
+        return error(StatusCode::NOT_FOUND, "instradamento non trovato");
+    };
+    if !route.signed {
+        return bad("questo instradamento non richiede link firmati: attivali prima");
+    }
+    if route.object_key(&path).is_none() {
+        return bad("il percorso non appartiene a questo instradamento o non è un file");
+    }
+    let exp = sign::now_secs() + req.ttl_secs;
+    let q = sign::query(&admin.state.signing_key.load(), &route.host, &path, exp);
+    let panel = panel::load(&admin.state_dir).unwrap_or_default();
+    let (scheme, port) = if req.https {
+        ("https", panel.settings.https())
+    } else {
+        ("http", panel.settings.http())
+    };
+    let default_port = if req.https { 443 } else { 80 };
+    let host_port = if port == default_port {
+        route.host.clone()
+    } else {
+        format!("{}:{port}", route.host)
+    };
+    // il percorso si ricodifica come lo farebbe un browser: la firma vale sul percorso decodificato
+    let enc = percent_encoding::utf8_percent_encode(&path, PATH_ENCODE).to_string();
+    let url = format!("{scheme}://{host_port}{enc}?{q}");
+    audit::log(
+        "link.create",
+        &format!("{}{} · {} s", route.host, path, req.ttl_secs),
+    );
+    json(StatusCode::OK, json!({ "url": url, "expires_at": exp }))
+}
+
+const PATH_ENCODE: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'<')
+    .add(b'>')
+    .add(b'?')
+    .add(b'`')
+    .add(b'{')
+    .add(b'}')
+    .add(b'%');
+
+async fn rotate_links(admin: &Admin) -> Response<Body> {
+    let _g = admin.write_lock.lock().await;
+    match sign::rotate(&admin.state_dir) {
+        Ok(k) => {
+            admin.state.signing_key.store(Arc::new(k));
+            audit::log("link.rotate", "");
+            json(StatusCode::OK, json!({ "ok": true }))
+        }
+        Err(e) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("salvataggio: {e}"),
+        ),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1587,7 +1749,12 @@ async fn warm(admin: &Admin, req: WarmReq) -> Response<Body> {
             results.push(json!({ "path": path, "status": null, "error": e }));
             continue;
         }
-        let url = format!("http://127.0.0.1:{}{}", admin.listen_port, path);
+        let url = format!(
+            "http://127.0.0.1:{}{}{}",
+            admin.listen_port,
+            path,
+            own_query(admin, &host, path)
+        );
         let t0 = Instant::now();
         let r = match client.get(&url).header(header::HOST, &host).send().await {
             Ok(mut resp) => {
@@ -1623,6 +1790,15 @@ async fn warm(admin: &Admin, req: WarmReq) -> Response<Body> {
         &format!("{} · {} file", req.rule, req.paths.len()),
     );
     json(StatusCode::OK, json!({ "results": results }))
+}
+
+fn human_duration(secs: u64) -> String {
+    match secs {
+        0..=59 => format!("{secs} secondi"),
+        60..=3599 => format!("{} minuti", secs / 60),
+        3600..=172_799 => format!("{} ore", secs / 3600),
+        _ => format!("{} giorni", secs / 86_400),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1773,6 +1949,41 @@ async fn diagnose(admin: &Admin, req: DiagnoseReq) -> Response<Body> {
     }
     let routed = route.clone().zip(object_key.clone());
 
+    // 2b. link firmato, se l'instradamento lo richiede
+    if let (Some(r), Some(p)) = (&route, &path) {
+        if r.signed {
+            let label = "Link firmato";
+            let key = admin.state.signing_key.load();
+            let step = match sign::verify(&key, &r.host, p, parsed.query(), sign::now_secs()) {
+                Ok(()) => {
+                    let left = parsed
+                        .query_pairs()
+                        .find(|(k, _)| k == "exp")
+                        .and_then(|(_, v)| v.parse::<u64>().ok())
+                        .map_or(0, |e| e.saturating_sub(sign::now_secs()));
+                    Step::new("signed", label, Status::Ok, format!("Il link è valido e scade tra {}.", human_duration(left)))
+                }
+                Err(sign::Denied::Missing) => Step::new(
+                    "signed",
+                    label,
+                    Status::Fail,
+                    "Questo instradamento richiede un link firmato: senza «exp» e «sig» nell'indirizzo il nodo risponde 403.",
+                )
+                .fix("Crea un link da Instradamenti → Link firmati e usa l'indirizzo completo."),
+                Err(sign::Denied::Expired) => Step::new("signed", label, Status::Fail, "Il link è scaduto.")
+                    .fix("Crea un nuovo link con una validità più lunga."),
+                Err(_) => Step::new(
+                    "signed",
+                    label,
+                    Status::Fail,
+                    "La firma non è valida: il percorso o la scadenza sono stati modificati, oppure la chiave dei link è stata ruotata.",
+                )
+                .fix("Crea un nuovo link: non si può correggere a mano."),
+            };
+            steps.push(step);
+        }
+    }
+
     // 3. cache
     let cache_label = "Cache";
     match &routed {
@@ -1839,7 +2050,12 @@ async fn diagnose(admin: &Admin, req: DiagnoseReq) -> Response<Body> {
     if routed.is_none() {
         steps.push(Step::skipped("response", resp_label));
     } else if let Ok(client) = s3::build_client(true) {
-        let url = format!("http://127.0.0.1:{}{}", admin.listen_port, raw_path);
+        let url = format!(
+            "http://127.0.0.1:{}{}{}",
+            admin.listen_port,
+            raw_path,
+            own_query(admin, &host, raw_path)
+        );
         let t0 = Instant::now();
         match client.get(&url).header(header::HOST, &host).send().await {
             Ok(resp) => {
@@ -1918,7 +2134,12 @@ async fn probe(admin: &Admin, req: ProbeReq) -> Response<Body> {
             "il percorso deve iniziare con / e non avere query",
         );
     }
-    let url = format!("http://127.0.0.1:{}{}", admin.listen_port, req.path);
+    let url = format!(
+        "http://127.0.0.1:{}{}{}",
+        admin.listen_port,
+        req.path,
+        own_query(admin, &host, &req.path)
+    );
     let client = match s3::build_client(true) {
         Ok(c) => c,
         Err(e) => return error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),

@@ -154,6 +154,9 @@ pub struct RawRoute {
     pub strip_prefix: bool,
     pub destination: String,
     pub cache_policy: String,
+    /// richiede un link firmato con scadenza (`?exp=&sig=`)
+    #[serde(default)]
+    pub signed_urls: bool,
 }
 
 fn default_region() -> String {
@@ -222,6 +225,7 @@ pub struct Route {
     /// "/" oppure "/docs/" (sempre con / iniziale e finale)
     pub path_prefix: String,
     pub strip_prefix: bool,
+    pub signed: bool,
     pub dest: Destination,
     pub policy: CachePolicy,
 }
@@ -434,6 +438,7 @@ pub fn validate(rc: RawConfig, env: &dyn Fn(&str) -> Option<String>) -> anyhow::
                 host,
                 path_prefix: prefix,
                 strip_prefix: r.strip_prefix,
+                signed: r.signed_urls,
                 dest: dest.clone(),
                 policy: policy.clone(),
             }));

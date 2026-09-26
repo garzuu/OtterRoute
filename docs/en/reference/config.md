@@ -96,5 +96,6 @@ Only one of the two forms:
 | `strip_prefix` | `true` | Removes the prefix before looking for the file. |
 | `destination` | — | `id` of a destination. |
 | `cache_policy` | — | `id` of a policy. |
+| `signed_urls` | `false` | Serves files only with a [signed link](/en/guide/signed-links) (`?exp=&sig=`); the key is in the state folder's `secrets/_signing.json` file. |
 
 Durations: `30s`, `5m`, `1h`, `24h`, `7d`.

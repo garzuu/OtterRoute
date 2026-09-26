@@ -32,7 +32,7 @@ OtterRoute serves **read-only** files from private buckets. Whoever visits has n
 
 | File | Contains |
 |---|---|
-| `secrets/*.json` | Bucket keys, SMTP password and Telegram token (0600 permissions). |
+| `secrets/*.json` | Bucket keys, SMTP password, Telegram token and the [signed links](./signed-links) key (0600 permissions). |
 | `users.json` | Password hashes, 2FA secrets, recovery code hashes (0600). |
 | `panel.json`, `last-good.yaml` | Configuration (without keys). |
 | `audit.jsonl` | Who did what (without secrets). |

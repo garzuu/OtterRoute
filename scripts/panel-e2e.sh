@@ -90,12 +90,65 @@ d="$(dg https://img.localhost/barca.jpg)"
 check "HTTPS: avvertenza sul proxy" warn "$(jget "d['steps'][0]['status']" <<<"$d")"
 check "indirizzo non valido" 422 "$(b='{"url":"://"}'; code $ADMIN/api/diagnose -d "$b")"
 
+echo "== link firmati"
+lk() { local b; b="$(python3 -c 'import json,sys; print(json.dumps({"rule": sys.argv[1], "path": sys.argv[2], "ttl_secs": int(sys.argv[3])}))' "$1" "$2" "$3")"; api $ADMIN/api/links -d "$b" | jget "d.get('url','')"; }
+st() { curl -s -o /dev/null -w '%{http_code}' -H "Host: img.localhost" "$@"; }
+tail_of() { echo "${1#http://img.localhost}"; }   # percorso + query di un link
+check "un link su un instradamento pubblico è rifiutato" 422 "$(b="$(python3 -c 'import json,sys; print(json.dumps({"rule": sys.argv[1], "path": "/barca.jpg", "ttl_secs": 60}))' "$rid")"; code $ADMIN/api/links -d "$b")"
+check "attiva i link firmati" True "$(api -X PUT "$ADMIN/api/rules/$rid" -d '{"signed":true}' | jget "d['signed']")"
+check "senza firma: 403" 403 "$(st "http://$GW/barca.jpg")"
+check "…anche se il file era in cache" 403 "$(st "http://$GW/mare.jpg")"
+u="$(lk "$rid" /barca.jpg 300)"
+check "il link ha exp e sig" 1 "$(grep -c 'barca.jpg?exp=[0-9]*&sig=[0-9a-f]\{64\}$' <<<"$u")"
+t="$(tail_of "$u")"
+check "con il link: 200" 200 "$(st "http://$GW$t")"
+check "con il link: HEAD 200" 200 "$(curl -s -o /dev/null -I -w '%{http_code}' -H 'Host: img.localhost' "http://$GW$t")"
+check "con il link: Range 206" 206 "$(st -H 'Range: bytes=0-1' "http://$GW$t")"
+check "ora il file è in cache, ma senza firma resta 403" 403 "$(st "http://$GW/barca.jpg")"
+check "altro percorso con la stessa firma: 403" 403 "$(st "http://$GW/mare.jpg?${t#*\?}")"
+check "scadenza modificata: 403" 403 "$(st "http://$GW${t/exp=/exp=9}")"
+check "firma alterata: 403" 403 "$(st "http://$GW${t%?}0")"
+check "firma malformata: 403" 403 "$(st "http://$GW/barca.jpg?exp=abc&sig=zz")"
+check "il 403 è uguale per ogni motivo" 1 "$(for q in "" "?exp=1&sig=00" "?exp=zz"; do curl -s -H 'Host: img.localhost' "http://$GW/barca.jpg$q"; done | sort -u | wc -l | tr -d ' ')"
+u1="$(lk "$rid" /barca.jpg 1)"; sleep 2.2
+check "link scaduto: 403" 403 "$(st "http://$GW$(tail_of "$u1")")"
+check "validità zero rifiutata" 422 "$(b="$(python3 -c 'import json,sys; print(json.dumps({"rule": sys.argv[1], "path": "/barca.jpg", "ttl_secs": 0}))' "$rid")"; code $ADMIN/api/links -d "$b")"
+check "percorso fuori dall'instradamento rifiutato" 422 "$(b="$(python3 -c 'import json,sys; print(json.dumps({"rule": sys.argv[1], "path": "/", "ttl_secs": 60}))' "$rid")"; code $ADMIN/api/links -d "$b")"
+check "la prova dal pannello funziona anche sui link firmati" 200 "$(b="$(python3 -c 'import json,sys; print(json.dumps({"host": "img.localhost", "path": "/mare.jpg"}))')"; api $ADMIN/api/probe -d "$b" | jget "d['status']")"
+d="$(dg "http://img.localhost$t")"
+check "diagnosi con link valido: passo firmato ok" ok "$(jget "[s for s in d['steps'] if s['id']=='signed'][0]['status']" <<<"$d")"
+d="$(dg http://img.localhost/barca.jpg)"
+check "diagnosi senza link: si ferma al link firmato" signed "$(jget "[s for s in d['steps'] if s['status']=='fail'][0]['id']" <<<"$d")"
+d="$(dg "http://img.localhost$(tail_of "$u1")")"
+check "diagnosi con link scaduto" True "$(jget "'scaduto' in [s for s in d['steps'] if s['id']=='signed'][0]['detail']" <<<"$d")"
+check "precarica su un instradamento firmato" 200 "$(b="$(python3 -c 'import json,sys; print(json.dumps({"rule": sys.argv[1], "paths": ["/mare.jpg"]}))' "$rid")"; api $ADMIN/api/warm -d "$b" | jget "d['results'][0]['status']")"
+# l'esempio Python della guida (estratto dalla pagina) deve produrre link accettati dal nodo
+gu="$(awk '/^```python/{f=1;next} /^```/{f=0} f' docs/it/guide/signed-links.md > "$work/snippet.py"; python3 -c "
+import json,sys
+sys.path.insert(0,'$work')
+from snippet import signed_url
+key=json.load(open('$work/state/secrets/_signing.json'))['key']
+print(signed_url(key,'img.localhost','/barca.jpg',300,'http'))")"
+check "il codice della guida produce un link valido" 200 "$(st "http://$GW$(tail_of "$gu")")"
+echo "== ruota la chiave"
+old="$t"
+check "ruota" True "$(api $ADMIN/api/links/rotate -d '{}' | jget "d['ok']")"
+check "il vecchio link non vale più" 403 "$(st "http://$GW$old")"
+n="$(tail_of "$(lk "$rid" /barca.jpg 300)")"
+check "un link nuovo vale" 200 "$(st "http://$GW$n")"
+check "disattiva i link firmati" False "$(api -X PUT "$ADMIN/api/rules/$rid" -d '{"signed":false}' | jget "d['signed']")"
+check "di nuovo pubblico" 200 "$(st "http://$GW/barca.jpg")"
+check "instradamento inesistente" 404 "$(code -X PUT $ADMIN/api/rules/nope -d '{"signed":true}')"
+
 echo "== permessi"
 api $ADMIN/api/users -d '{"username":"lettore","role":"viewer","password":"password-lettore-1"}' >/dev/null
 rm -f "$work/jar"; api $ADMIN/api/login -d '{"username":"lettore","password":"password-lettore-1"}' >/dev/null
 api -X PUT $ADMIN/api/me/password -d '{"current":"password-lettore-1","new":"password-lettore-2"}' >/dev/null  # la temporanea va cambiata al primo accesso
 check "sola lettura: niente purge" 403 "$(b="$(pj rule "$rid")"; code $ADMIN/api/purge -d "$b")"
 check "sola lettura: può fare la diagnosi" 200 "$(b='{"url":"http://img.localhost/barca.jpg"}'; code $ADMIN/api/diagnose -d "$b")"
+check "sola lettura: niente link" 403 "$(b='{"rule":"x","path":"/a","ttl_secs":60}'; code $ADMIN/api/links -d "$b")"
+check "sola lettura: non ruota la chiave" 403 "$(code $ADMIN/api/links/rotate -d '{}')"
+check "sola lettura: non attiva i link firmati" 403 "$(code -X PUT $ADMIN/api/rules/$rid -d '{"signed":true}')"
 check "sola lettura: niente precarica" 403 "$(b="$(python3 -c 'import json,sys; print(json.dumps({"rule": sys.argv[1], "paths": ["/x"]}))' "$rid")"; code $ADMIN/api/warm -d "$b")"
 
 echo; echo "passati: $pass, falliti: $fail"
