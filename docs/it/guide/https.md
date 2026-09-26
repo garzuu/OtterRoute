@@ -7,7 +7,7 @@ OtterRoute può servire **HTTPS da solo**: ottiene un certificato gratuito per o
 1. Nelle **Impostazioni → HTTPS automatico** spunti *Ottieni e rinnova i certificati* (e, facoltativo, indichi un'email di contatto per la CA).
 2. Per ogni dominio **verificato** il nodo chiede un certificato a Let's Encrypt con la sfida **HTTP-01**: la CA fa una richiesta a `http://tuodominio/.well-known/acme-challenge/…` sulla porta 80 e il nodo risponde con la prova.
 3. Il certificato viene salvato in `certs/<dominio>/` nella cartella di stato (la chiave con permessi `0600`) e usato subito: il nodo sceglie il certificato giusto in base al nome richiesto dal browser (SNI).
-4. **30 giorni prima della scadenza** il nodo lo rinnova da solo. Se un'emissione fallisce, riprova dopo un'ora (le CA limitano i tentativi) e ti avvisa nella campanella e, se le hai attivate, nelle [notifiche](./notifications).
+4. **30 giorni prima della scadenza** il nodo lo rinnova da solo (per i certificati di breve durata la finestra si riduce a un terzo della loro vita, così non si rinnovano a ogni giro). Se un'emissione fallisce, riprova dopo un'ora (le CA limitano i tentativi) e ti avvisa nella campanella e, se le hai attivate, nelle [notifiche](./notifications).
 
 Lo stato di ogni dominio è nella colonna **HTTPS** della pagina *Domini*: *Valido*, *In scadenza* (meno di 14 giorni), *Scaduto*, *Non emesso*, *In emissione*, *Errore* (con il messaggio della CA). Dalla riga espansa puoi **Richiedere** o **Rinnovare ora** un certificato.
 

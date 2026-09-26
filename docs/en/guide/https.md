@@ -10,7 +10,7 @@ OtterRoute can serve **HTTPS by itself**: it obtains a free certificate for ever
 1. In **Settings → Automatic HTTPS** tick *Obtain and renew certificates* (and, optionally, give a contact email for the CA).
 2. For every **verified** domain the node asks Let's Encrypt for a certificate using the **HTTP-01** challenge: the CA makes a request to `http://yourdomain/.well-known/acme-challenge/…` on port 80 and the node answers with the proof.
 3. The certificate is saved in `certs/<domain>/` in the state folder (the key with `0600` permissions) and used immediately: the node picks the right certificate from the name the browser asks for (SNI).
-4. **30 days before expiry** the node renews it by itself. If an issuance fails, it retries after an hour (CAs limit attempts) and warns you in the bell and, if enabled, in [notifications](./notifications).
+4. **30 days before expiry** the node renews it by itself (for short-lived certificates the window shrinks to a third of their life, so they are not renewed at every pass). If an issuance fails, it retries after an hour (CAs limit attempts) and warns you in the bell and, if enabled, in [notifications](./notifications).
 
 The state of each domain is in the **HTTPS** column of the *Domains* page: *Valid*, *Expiring* (less than 14 days), *Expired*, *Not issued*, *Issuing*, *Error* (with the CA's message). From the expanded row you can **Request** or **Renew now** a certificate.
 
