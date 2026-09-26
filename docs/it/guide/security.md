@@ -29,7 +29,7 @@ OtterRoute serve file di **sola lettura** da bucket privati. Chi lo visita non h
 
 | File | Contiene |
 |---|---|
-| `secrets/*.json` | Chiavi dei bucket, password SMTP e token Telegram (permessi 0600). |
+| `secrets/*.json` | Chiavi dei bucket, password SMTP, token Telegram e chiave dei [link firmati](./signed-links) (permessi 0600). |
 | `users.json` | Hash delle password, segreti 2FA, hash dei codici di recupero (0600). |
 | `panel.json`, `last-good.yaml` | Configurazione (senza chiavi). |
 | `audit.jsonl` | Chi ha fatto cosa (senza segreti). |

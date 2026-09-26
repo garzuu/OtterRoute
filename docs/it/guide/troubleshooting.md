@@ -29,6 +29,7 @@ Cerca il messaggio che vedi nel pannello o nella risposta. Se non lo trovi, la p
 | `404` da un dominio | Nessun instradamento per quell'host, o il prefisso non corrisponde. | Crea l'instradamento; vince il prefisso più lungo. |
 | Un file corretto risulta ancora `404` | Cache negativa (60 secondi). | Attendi un minuto. |
 | Il file non si aggiorna | La copia è ancora fresca (1 ora). | Attendi, o incrementa `cache_generation` ([Cache](./cache)). |
+| `403` con `?exp=&sig=` nell'indirizzo | L'instradamento richiede [link firmati](./signed-links) e il link è scaduto, alterato o emesso con una chiave poi ruotata. | Crea un nuovo link; la pagina [Diagnosi](./diagnosis) dice quale dei tre casi è. |
 | `405` / `400` | Il gateway accetta solo `GET` e `HEAD` (405); percorsi con `..` o caratteri di controllo sono rifiutati (400). | Usa un percorso normale. |
 | `X-Cache: STALE` | Lo storage non risponde e si serve una copia scaduta. | Ripristina lo storage. |
 

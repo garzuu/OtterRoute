@@ -4,6 +4,9 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e i
 
 ## [Non rilasciato]
 
+### Aggiunto
+- **Link firmati** con scadenza (`?exp=&sig=`, HMAC-SHA256 con la chiave del nodo): per instradamento, verificati prima della cache, con creazione dal pannello, rotazione della chiave e passo dedicato nella Diagnosi.
+
 ## [0.1.0]
 
 ### Aggiunto

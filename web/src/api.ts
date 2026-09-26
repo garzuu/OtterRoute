@@ -124,6 +124,8 @@ export interface RuleInfo {
   path_prefix: string;
   bucket_id: string;
   folder: string;
+  cache_generation: number;
+  signed: boolean;
 }
 
 export interface LiveRoute {
@@ -336,6 +338,11 @@ export const api = {
 
   addRule: (r: { domain: string; path_prefix: string; bucket_id: string; folder: string }) =>
     post<RuleInfo>("/api/rules", r),
+  setRuleSigned: (id: string, signed: boolean) =>
+    request<{ id: string; signed: boolean }>(`/api/rules/${encodeURIComponent(id)}`, "PUT", { signed }),
+  createLink: (b: { rule: string; path: string; ttl_secs: number; https?: boolean }) =>
+    post<{ url: string; expires_at: number }>("/api/links", b),
+  rotateLinks: () => post<{ ok: boolean }>("/api/links/rotate"),
   purgeCache: (rule: string, path?: string) => post<{ all?: boolean; removed?: number }>("/api/purge", { rule, path }),
   warmCache: (rule: string, paths: string[]) => post<{ results: WarmResult[] }>("/api/warm", { rule, paths }),
   deleteRule: (id: string) => del(`/api/rules/${encodeURIComponent(id)}`),

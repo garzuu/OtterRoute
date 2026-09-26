@@ -16,6 +16,7 @@ mod notify;
 mod panel;
 mod routing;
 mod s3;
+mod sign;
 mod totp;
 mod users;
 
@@ -133,6 +134,7 @@ async fn main() -> anyhow::Result<()> {
         max_object_bytes: args.cache_max_object_bytes,
         node_id: load_node_id(&args.state_dir),
         metrics: metrics.clone(),
+        signing_key: ArcSwap::from_pointee(sign::load_or_create(&args.state_dir)),
     });
 
     tokio::spawn(watch_config(

@@ -52,6 +52,12 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
       render: (x) => bucketOf(x)?.name ?? <span className="muted">—</span>,
     },
     {
+      key: "access",
+      header: "Accesso",
+      sort: (x) => (x.signed ? "1" : "0"),
+      render: (x) => (x.signed ? <span className="badge warn">Link firmati</span> : <span className="badge">Pubblico</span>),
+    },
+    {
       key: "domain",
       header: "Dominio",
       sort: (x) => {
@@ -110,6 +116,7 @@ export function Routes(props: { state: PanelState; refresh: () => Promise<void>;
           expand={(x) => (
             <>
               <ProbePanel r={x} port={state.http_port} onDiagnose={(u) => { setDiagnosisTarget(u); go("diagnosis"); }} />
+              {canWrite && <LinksPanel r={x} refresh={refresh} />}
               {canWrite && <CachePanel r={x} />}
             </>
           )}
@@ -253,6 +260,148 @@ function NewRule(props: { state: PanelState; go: (p: PageId) => void; onClose: (
     <Modal title="Nuovo instradamento" onClose={props.onClose}>
       <RuleForm state={props.state} go={props.go} onCancel={props.onClose} onSaved={props.onSaved} />
     </Modal>
+  );
+}
+
+const TTLS: [string, number][] = [
+  ["5 minuti", 300],
+  ["1 ora", 3600],
+  ["24 ore", 86400],
+  ["7 giorni", 604800],
+  ["30 giorni", 2592000],
+];
+
+/** Link firmati con scadenza: attivazione per instradamento e creazione dei link. */
+function LinksPanel(props: { r: RuleInfo; refresh: () => Promise<void> }) {
+  const { r } = props;
+  const { can } = useAuth();
+  const [file, setFile] = useState("");
+  const [ttl, setTtl] = useState(3600);
+  const [https, setHttps] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [link, setLink] = useState<{ url: string; expires_at: number } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [armed, setArmed] = useState(false);
+  const full = `${r.path_prefix}${file.trim().replace(/^\//, "")}`;
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await fn();
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="details">
+      <strong>Link firmati</strong>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={r.signed}
+          disabled={busy}
+          onChange={(e) =>
+            run(async () => {
+              await api.setRuleSigned(r.id, e.target.checked);
+              setLink(null);
+              await props.refresh();
+            })
+          }
+        />
+        <span>
+          I file di questo instradamento si aprono solo con un <strong>link firmato e con scadenza</strong>. Senza, il nodo risponde 403 (anche per i file già in cache).
+        </span>
+      </label>
+      {r.signed && (
+        <>
+          <div className="inline tight">
+            <input value={file} onChange={(e) => setFile(e.target.value)} placeholder="file, es. barca.jpg" aria-label="File del link" spellCheck={false} />
+            <select value={ttl} onChange={(e) => setTtl(Number(e.target.value))} aria-label="Validità" style={{ width: "auto" }}>
+              {TTLS.map(([l, s]) => (
+                <option key={s} value={s}>
+                  Valido {l}
+                </option>
+              ))}
+            </select>
+            <button
+              className="secondary small"
+              disabled={busy || !file.trim()}
+              onClick={() =>
+                run(async () => {
+                  setLink(await api.createLink({ rule: r.id, path: full, ttl_secs: ttl, https }));
+                  setCopied(false);
+                })
+              }
+            >
+              Crea link
+            </button>
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={https} onChange={(e) => setHttps(e.target.checked)} />
+            <span>Usa https:// nell’indirizzo (se davanti al nodo c’è un proxy con HTTPS)</span>
+          </label>
+          {link && (
+            <div className="box good">
+              <div>
+                Scade il <strong>{new Date(link.expires_at * 1000).toLocaleString("it-IT")}</strong>
+              </div>
+              <div className="inline tight">
+                <input readOnly value={link.url} aria-label="Link firmato" onFocus={(e) => e.currentTarget.select()} />
+                <button
+                  className="secondary small"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(link.url);
+                      setCopied(true);
+                    } catch {
+                      setMsg({ ok: false, text: "Copia non riuscita: seleziona il link a mano." });
+                    }
+                  }}
+                >
+                  {copied ? "Copiato ✓" : "Copia"}
+                </button>
+              </div>
+            </div>
+          )}
+          {can("settings:write") && (
+            <div className="inline tight">
+              {armed ? (
+                <>
+                  <button
+                    className="danger small"
+                    disabled={busy}
+                    onClick={() =>
+                      run(async () => {
+                        await api.rotateLinks();
+                        setArmed(false);
+                        setLink(null);
+                        setMsg({ ok: true, text: "Chiave ruotata: tutti i link emessi finora non valgono più." });
+                      })
+                    }
+                  >
+                    Conferma: invalida tutti i link
+                  </button>
+                  <button className="ghost small" onClick={() => setArmed(false)}>
+                    Annulla
+                  </button>
+                </>
+              ) : (
+                <button className="ghost small" onClick={() => setArmed(true)} disabled={busy}>
+                  Ruota la chiave
+                </button>
+              )}
+              <span className="muted small-text">Vale per tutti gli instradamenti del nodo.</span>
+            </div>
+          )}
+        </>
+      )}
+      {msg && <div className={`box ${msg.ok ? "good" : "bad"}`}>{msg.text}</div>}
+    </div>
   );
 }
 

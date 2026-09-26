@@ -19,6 +19,8 @@ source_commit: dd1d866
 
 **Route** — rule *domain + prefix → destination + cache policy*.
 
+**Signed link** — address with `exp` (expiry) and `sig` (signature) that lets you open a restricted file for a limited time. → [Signed links](./signed-links)
+
 **Node** — an OtterRoute installation.
 
 **Path-style / virtual-host** — the two ways of addressing a bucket: `endpoint/bucket/key` or `bucket.endpoint/key`.

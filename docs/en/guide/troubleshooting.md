@@ -32,6 +32,7 @@ Look for the message you see in the panel or in the response. If you cannot find
 | `404` from a domain | No route for that host, or the prefix does not match. | Create the route; the longest prefix wins. |
 | A correct file still gives `404` | Negative cache (60 seconds). | Wait a minute. |
 | The file does not update | The copy is still fresh (1 hour). | Wait, or increase `cache_generation` ([Cache](./cache)). |
+| `403` with `?exp=&sig=` in the address | The route requires [signed links](./signed-links) and the link is expired, tampered with or issued with a key that was later rotated. | Create a new link; the [Diagnosis](./diagnosis) page says which of the three it is. |
 | `405` / `400` | The gateway accepts only `GET` and `HEAD` (405); paths with `..` or control characters are rejected (400). | Use a normal path. |
 | `X-Cache: STALE` | The storage does not answer and an expired copy is served. | Restore the storage. |
 

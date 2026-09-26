@@ -16,6 +16,8 @@
 
 **Instradamento** — regola *dominio + prefisso → destinazione + politica di cache*.
 
+**Link firmato** — indirizzo con `exp` (scadenza) e `sig` (firma) che permette di aprire un file riservato per un tempo limitato. → [Link firmati](./signed-links)
+
 **Nodo** — un'installazione di OtterRoute.
 
 **Path-style / virtual-host** — i due modi di indirizzare un bucket: `endpoint/bucket/chiave` oppure `bucket.endpoint/chiave`.

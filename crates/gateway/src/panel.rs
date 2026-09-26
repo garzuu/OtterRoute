@@ -120,6 +120,9 @@ pub struct Rule {
     /// aumentarlo rende irraggiungibili le copie in cache dell'instradamento
     #[serde(default = "first_generation")]
     pub cache_generation: u64,
+    /// i file si servono solo con un link firmato e con scadenza
+    #[serde(default)]
+    pub signed: bool,
 }
 
 fn first_generation() -> u64 {
@@ -185,6 +188,7 @@ pub fn generate_config(panel: &Panel, version: u64, secrets: &Path) -> Value {
             "path_prefix": r.path_prefix,
             "destination": r.id,
             "cache_policy": "standard",
+            "signed_urls": r.signed,
         }));
     }
     json!({
@@ -233,12 +237,14 @@ mod tests {
                 bucket_id: "b1".into(),
                 folder: "foto/".into(),
                 cache_generation: 4,
+                signed: true,
             }],
             ..Panel::default()
         };
         let yaml = serde_yaml::to_string(&generate_config(&panel, 3, dir.path())).unwrap();
         let snap = crate::config::parse(yaml.as_bytes()).unwrap();
         assert_eq!(snap.version, 3);
+        assert!(snap.routes_by_host["img.example.com"][0].signed);
         assert_eq!(
             yaml.matches("cache_generation: 4").count(),
             1,

@@ -44,6 +44,8 @@ pub struct AppState {
     pub node_id: String,
     /// contatori di traffico (dashboard e /metrics)
     pub metrics: Arc<crate::metrics::Metrics>,
+    /// chiave dei link firmati (si può ruotare dal pannello)
+    pub signing_key: ArcSwap<Vec<u8>>,
 }
 
 struct Ctx {
@@ -213,6 +215,20 @@ async fn handle_inner(
     let route = snap.match_route(&host, &path).ok_or(NOT_FOUND)?.clone();
     crate::metrics::note_route(&route.id);
     let key = route.object_key(&path).ok_or(NOT_FOUND)?;
+    // link firmati: si controlla PRIMA della cache, così una copia già salvata
+    // non si serve a chi non ha un link valido. Stessa risposta per ogni motivo.
+    if route.signed
+        && crate::sign::verify(
+            &state.signing_key.load(),
+            &route.host,
+            &path,
+            parts.uri.query(),
+            crate::sign::now_secs(),
+        )
+        .is_err()
+    {
+        return Err(HttpError(StatusCode::FORBIDDEN, "forbidden"));
+    }
     let ck = cache_key(
         &route,
         &key,
