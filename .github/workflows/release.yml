@@ -75,7 +75,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - uses: Swatinem/rust-cache@v2
         with: { key: "${{ matrix.target }}" }
-      - run: cargo build --release --locked -p otterroute --target ${{ matrix.target }}
+      - name: Compila
+        shell: bash
+        run: |
+          # il binario dichiara la versione del TAG (es. 0.1.2-rc1): l'auto-aggiornamento controlla che
+          # il nuovo eseguibile dichiari la versione della release, e una pre-release deve poter
+          # essere distinta dalla versione finale
+          if [ "$GITHUB_REF_TYPE" = tag ]; then export OTR_BUILD_VERSION="${GITHUB_REF_NAME#v}"; fi
+          cargo build --release --locked -p otterroute --target ${{ matrix.target }}
       - uses: actions/download-artifact@v4
         with: { name: assets, path: assets }
       - name: Pacchetto

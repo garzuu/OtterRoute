@@ -1,6 +1,7 @@
 ## [Non rilasciato]
 
 ### Corretto
+- Auto-aggiornamento a una pre-release: il binario di una release dichiara ora la versione del tag (es. `0.1.2-rc1`), altrimenti il nodo rifiutava l'aggiornamento («non dichiara la versione»). Trovato provando l'aggiornamento dal vivo da 0.1.1 a `v0.1.2-rc1`.
 - Guida: dietro Cloudflare (nuvola arancione) l'emissione ACME non «fallisce» sempre; riesce se la sfida non viene reindirizzata a HTTPS. Aggiunti i passi per farla passare.
 
 ### Modificato
