@@ -7,6 +7,8 @@ Un dominio è utilizzabile solo dopo essere stato **verificato**. La verifica no
 
 ## Cosa controlla la verifica
 
+<!--@include: @/diagrams/domain-check.it.svg-->
+
 Per ogni dominio il pannello esegue in sequenza:
 
 | Passaggio | Cosa fa | Se fallisce |

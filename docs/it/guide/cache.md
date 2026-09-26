@@ -5,6 +5,8 @@ Ogni file richiesto viene tenuto su disco. Le richieste successive partono dal d
 ![Sezione «Cache» della riga di un instradamento: svuota e precarica](/screens/routes.jpg)
 <p class="shot-caption">Sezione «Cache» della riga di un instradamento: svuota e precarica · 26/09/2026</p>
 
+<!--@include: @/diagrams/cache-decision.it.svg-->
+
 ## Cosa dice `X-Cache`
 
 | Valore | Significato |

@@ -10,6 +10,8 @@ A domain is usable only after being **verified**. Verification does not stop at 
 
 ## What verification checks
 
+<!--@include: @/diagrams/domain-check.en.svg-->
+
 For each domain the panel runs in sequence:
 
 | Step | What it does | If it fails |

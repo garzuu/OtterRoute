@@ -7,6 +7,8 @@ OtterRoute can serve **HTTPS by itself**: it obtains a free certificate for ever
 
 ## How it works
 
+<!--@include: @/diagrams/https-acme.en.svg-->
+
 1. In **Settings → Automatic HTTPS** tick *Obtain and renew certificates* (and, optionally, give a contact email for the CA).
 2. For every **verified** domain the node asks Let's Encrypt for a certificate using the **HTTP-01** challenge: the CA makes a request to `http://yourdomain/.well-known/acme-challenge/…` on port 80 and the node answers with the proof.
 3. The certificate is saved in `certs/<domain>/` in the state folder (the key with `0600` permissions) and used immediately: the node picks the right certificate from the name the browser asks for (SNI).

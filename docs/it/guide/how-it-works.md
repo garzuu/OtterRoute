@@ -4,16 +4,7 @@ OtterRoute è un **gateway di sola lettura** davanti a uno o più bucket compati
 
 ## Il percorso di una richiesta
 
-```text
-visitatore ──► DNS ──► [proxy / CDN / load balancer] ──► OtterRoute :80
-                                                            │
-                          1. host + percorso → instradamento (vince il prefisso più lungo)
-                          2. copia fresca in cache?  ── sì ──► risposta (X-Cache: HIT)
-                                     │ no
-                          3. richiesta firmata (SigV4) al bucket ──► S3
-                          4. il file arriva al visitatore mentre si scrive in cache
-                                                            (X-Cache: MISS)
-```
+<!--@include: @/diagrams/request-flow.it.svg-->
 
 1. **Instradamento.** L'host della richiesta (`img.azienda.it`) e l'inizio del percorso (`/foto/`) scelgono un *instradamento*. Se più regole coincidono vince il prefisso più lungo, confrontato per segmenti interi: `/docs/` non intercetta `/docsx/`.
 2. **Cache.** Se esiste una copia fresca su disco la risposta parte subito. Le copie scadute si rivalidano con lo storage (`304`) e, se lo storage non risponde, si possono servire comunque per un po'.
@@ -21,6 +12,8 @@ visitatore ──► DNS ──► [proxy / CDN / load balancer] ──► Otter
 4. **Risposta.** Il file viene inviato in streaming mentre si salva in cache, senza caricarlo in memoria. L'header `X-Cache` dice cosa è successo: `HIT`, `MISS`, `STALE`, `REVALIDATED`, `BYPASS`.
 
 ## Le parti del sistema
+
+<!--@include: @/diagrams/architecture.it.svg-->
 
 | Parte | Dove | Cosa fa |
 |---|---|---|
