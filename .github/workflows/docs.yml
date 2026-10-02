@@ -43,13 +43,26 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v4
-      - name: Link esterni
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - run: npm ci
+        working-directory: docs
+      - name: Build della guida (risolve i link root-relative come farebbe il sito)
+        run: npm run docs:build
+        working-directory: docs
+        env:
+          DOCS_BASE: /
+      - name: Link esterni e interni
         id: lychee
         uses: lycheeverse/lychee-action@v2
         with:
-          # solo link esterni: quelli interni (./pagina, /en/…) non si risolvono sui .md di VitePress e si
-          # controllano già con la build della guida (`npm run docs:build`)
-          args: --no-progress --max-concurrency 4 --scheme http --scheme https --accept 200,201,204,301,302,403,429 'docs/it/**/*.md' 'docs/en/**/*.md'
+          # si controlla l'output buildato (non i .md grezzi): i link root-relative (/en/…, /screens/…)
+          # sono risolti da VitePress (cleanUrls, rewrite IT, asset in public/) e lychee li verifica con
+          # --root-dir + --fallback-extensions, anziché fallire perché non sa come risolverli dai sorgenti.
+          args: --no-progress --max-concurrency 4 --scheme http --scheme https --root-dir ${{ github.workspace }}/docs/.vitepress/dist --fallback-extensions html --accept 200,201,204,301,302,403,429 'docs/.vitepress/dist/**/*.html'
           fail: false
       - name: Segnala i link rotti
         if: steps.lychee.outputs.exit_code != 0
